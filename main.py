@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -23,6 +22,10 @@ STATE_FILE = Path("state.json")
 # Paramètres
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
 ALLOWED_IMPACT = {"Medium", "High"}
+
+# ✅ TES ACTIFS SUIVIS (filtrage final)
+WATCHED_ASSETS = {"EURUSD", "GBPUSD", "XAUUSD", "DE30"}
+
 REMINDER_LEAD_MIN = 15
 REMINDER_WINDOW_MIN = 6          # tolérance, car GitHub Actions tourne toutes les 5 min
 SOURCE_FAIL_ALERT_AFTER = 3      # nb d'échecs consécutifs avant alerte Telegram
@@ -70,7 +73,6 @@ def fetch_ff_xml() -> str:
 
 
 def parse_ff_datetime(date_str: str, time_str: str) -> datetime | None:
-
     if not date_str or not time_str:
         return None
 
@@ -121,11 +123,9 @@ def fetch_events() -> list[tuple[datetime, dict]]:
     return events
 
 
-def fmt_line(dt: datetime, ev: dict) -> str:
-    return f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}"
-
 def flag_for_currency(cur: str) -> str:
     return {"USD": "🇺🇸", "EUR": "🇪🇺", "GBP": "🇬🇧"}.get(cur, "🏳️")
+
 
 def impacted_assets(currency: str) -> list[str]:
     """
@@ -143,13 +143,24 @@ def impacted_assets(currency: str) -> list[str]:
         return ["GBPUSD"]
     return []
 
+
+def relevant_assets_for_event(ev: dict) -> list[str]:
+    """Intersection actifs impactés x actifs suivis."""
+    assets = impacted_assets(ev["country"])
+    return [a for a in assets if a in WATCHED_ASSETS]
+
+
+def is_relevant_event(ev: dict) -> bool:
+    return len(relevant_assets_for_event(ev)) > 0
+
+
 def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
     cur = ev["country"]
-    imp = ev["impact"].upper()   # Medium/High
+    imp = ev["impact"].upper()
     title = ev["title"]
 
-    assets = impacted_assets(cur)
-    assets_block = "\n".join(f"• {a}" for a in assets) if assets else "• (non défini)"
+    assets = relevant_assets_for_event(ev)
+    assets_block = "\n".join(f"• {a}" for a in assets) if assets else "• (aucun)"
 
     return (
         "⚠️ MACRO ALERT\n\n"
@@ -160,29 +171,36 @@ def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
         f"{assets_block}"
     )
 
+
 def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
     """
-    Résumé 07:00 : regroupe par devise et garde l’ordre chronologique.
+    Résumé 07:00 : UNIQUEMENT les news du jour qui touchent tes actifs suivis.
+    Regroupe par devise, garde l’ordre chronologique.
     """
     lines_by_cur = {"USD": [], "EUR": [], "GBP": []}
 
     for dt, ev in events:
         if dt.date() != day:
             continue
-        cur = ev["country"]
-        if cur not in lines_by_cur:
+        if not is_relevant_event(ev):
             continue
-        lines_by_cur[cur].append(f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['title']}")
 
-    parts = ["🗓️ Macro du jour (USD/EUR/GBP — Medium+High)"]
+        cur = ev["country"]
+        assets = ", ".join(relevant_assets_for_event(ev))
+        lines_by_cur[cur].append(f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['title']}  ({assets})")
 
-    for cur in ("EUR", "GBP", "USD"):  # ordre utile pour tes actifs
+    parts = ["🗓️ Macro du jour (Medium+High) — filtré sur tes actifs"]
+
+    for cur in ("EUR", "GBP", "USD"):
         if lines_by_cur[cur]:
             parts.append(f"\n{flag_for_currency(cur)} {cur}")
             parts.extend(lines_by_cur[cur])
 
     if len(parts) == 1:
-        return "🗓️ Macro du jour\nAucun événement Medium/High (USD/EUR/GBP) aujourd’hui."
+        return (
+            "🗓️ Macro du jour\n"
+            "Aucun événement Medium/High pertinent aujourd’hui (sur EURUSD/GBPUSD/XAUUSD/DE30)."
+        )
 
     return "\n".join(parts)
 
@@ -207,7 +225,10 @@ def main():
             if last:
                 try:
                     last_dt = datetime.fromisoformat(last)
-                    if (now - last_dt.replace(tzinfo=TZ)) < timedelta(hours=6):
+                    # last_dt est déjà ISO; on force TZ Paris si absent
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=TZ)
+                    if (now - last_dt) < timedelta(hours=6):
                         allow = False
                 except Exception:
                     pass
@@ -251,6 +272,10 @@ def main():
 
     for dt, ev in events:
         if not (start <= dt < end):
+            continue
+
+        # ✅ Filtre final sur tes actifs
+        if not is_relevant_event(ev):
             continue
 
         key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
