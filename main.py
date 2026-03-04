@@ -262,3 +262,6 @@ def main():
         state["sent_reminders"][key] = now.isoformat()
 
     save_state(state)
+    
+    if __name__ == "__main__":
+        main()
