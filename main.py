@@ -195,29 +195,6 @@ def main():
     # 1) Récupération events avec fallback + monitoring
     try:
         events = fetch_events()
-        # DEBUG TEST : envoie les prochains événements
-if os.environ.get("DEBUG_ALWAYS") == "1":
-
-    upcoming = []
-
-    for dt, ev in events:
-        if dt >= now:
-            upcoming.append(
-                f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}"
-            )
-
-        if len(upcoming) >= 5:
-            break
-
-    if upcoming:
-        tg_send(
-            "DEBUG CALENDAR\n\n"
-            f"Now: {now.strftime('%H:%M')} (Paris)\n\n"
-            "Prochains événements:\n"
-            + "\n".join(upcoming)
-        )
-    else:
-        tg_send("DEBUG CALENDAR : aucun événement trouvé.")
         # reset failures si OK
         state["source_failures"] = 0
     except Exception as e:
@@ -259,6 +236,32 @@ if os.environ.get("DEBUG_ALWAYS") == "1":
 
         save_state(state)
         return
+
+# DEBUG TEST
+if os.environ.get("DEBUG_ALWAYS") == "1":
+
+    upcoming = []
+
+    for dt, ev in events:
+        if dt >= now:
+            upcoming.append(
+                f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}"
+            )
+
+        if len(upcoming) >= 5:
+            break
+
+    if upcoming:
+        tg_send(
+            "DEBUG CALENDAR\n\n"
+            f"Now: {now.strftime('%H:%M')} (Paris)\n\n"
+            "Prochains événements:\n"
+            + "\n".join(upcoming)
+        )
+    else:
+        tg_send("DEBUG CALENDAR : aucun événement trouvé.")
+
+    
 
     # 2) Résumé quotidien à 07:00 Paris (une seule fois)
     if today_key not in state["sent_daily"] and (now.hour == 7 and now.minute <= 5):
