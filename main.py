@@ -23,7 +23,7 @@ STATE_FILE = Path("state.json")
 # Paramètres
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
 ALLOWED_IMPACT = {"Medium", "High"}
-REMINDER_LEAD_MIN = 15
+REMINDER_LEAD_MIN = 1
 REMINDER_WINDOW_MIN = 6          # tolérance, car GitHub Actions tourne toutes les 5 min
 SOURCE_FAIL_ALERT_AFTER = 3      # nb d'échecs consécutifs avant alerte Telegram
 
