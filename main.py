@@ -124,6 +124,68 @@ def fetch_events() -> list[tuple[datetime, dict]]:
 def fmt_line(dt: datetime, ev: dict) -> str:
     return f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}"
 
+def flag_for_currency(cur: str) -> str:
+    return {"USD": "🇺🇸", "EUR": "🇪🇺", "GBP": "🇬🇧"}.get(cur, "🏳️")
+
+def impacted_assets(currency: str) -> list[str]:
+    """
+    Mapping "trading" (simple et utile).
+    - USD impacte: EURUSD, GBPUSD, XAUUSD (et souvent indices globaux)
+    - EUR impacte: EURUSD + DE30 (proxy Europe/Allemagne)
+    - GBP impacte: GBPUSD
+    """
+    c = currency.upper()
+    if c == "USD":
+        return ["EURUSD", "GBPUSD", "XAUUSD"]
+    if c == "EUR":
+        return ["EURUSD", "DE30"]
+    if c == "GBP":
+        return ["GBPUSD"]
+    return []
+
+def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
+    cur = ev["country"]
+    imp = ev["impact"].upper()   # Medium/High
+    title = ev["title"]
+
+    assets = impacted_assets(cur)
+    assets_block = "\n".join(f"• {a}" for a in assets) if assets else "• (non défini)"
+
+    return (
+        "⚠️ MACRO ALERT\n\n"
+        f"⏰ Dans {lead_min} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
+        f"{flag_for_currency(cur)} {cur} — {imp}\n"
+        f"{title}\n\n"
+        "Actifs concernés\n"
+        f"{assets_block}"
+    )
+
+def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
+    """
+    Résumé 07:00 : regroupe par devise et garde l’ordre chronologique.
+    """
+    lines_by_cur = {"USD": [], "EUR": [], "GBP": []}
+
+    for dt, ev in events:
+        if dt.date() != day:
+            continue
+        cur = ev["country"]
+        if cur not in lines_by_cur:
+            continue
+        lines_by_cur[cur].append(f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['title']}")
+
+    parts = ["🗓️ Macro du jour (USD/EUR/GBP — Medium+High)"]
+
+    for cur in ("EUR", "GBP", "USD"):  # ordre utile pour tes actifs
+        if lines_by_cur[cur]:
+            parts.append(f"\n{flag_for_currency(cur)} {cur}")
+            parts.extend(lines_by_cur[cur])
+
+    if len(parts) == 1:
+        return "🗓️ Macro du jour\nAucun événement Medium/High (USD/EUR/GBP) aujourd’hui."
+
+    return "\n".join(parts)
+
 
 def main():
     state = load_state()
@@ -197,12 +259,9 @@ def main():
         if key in state["sent_reminders"]:
             continue
 
-        msg = (
-            f"⏰ Dans 15 min — [{ev['impact']}] {ev['country']}\n"
-            f"{ev['title']}\n"
-            f"Heure: {dt.strftime('%H:%M')} (Paris)"
-        )
+        msg = format_macro_alert(dt, ev, REMINDER_LEAD_MIN)
         tg_send(msg)
+
         state["sent_reminders"][key] = now.isoformat()
 
     save_state(state)
