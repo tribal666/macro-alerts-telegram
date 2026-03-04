@@ -195,23 +195,9 @@ def main():
     # 1) Récupération events avec fallback + monitoring
     try:
         events = fetch_events()
-        # reset failures si OK
         state["source_failures"] = 0
     except Exception as e:
         state["source_failures"] = int(state.get("source_failures", 0)) + 1
-
-            # DEBUG: sur exécution manuelle, envoyer les prochains events
-    if os.environ.get("DEBUG_NEXT") == "1":
-        upcoming = []
-        for dt, ev in events:
-            if dt >= now:
-                upcoming.append(f"{dt.strftime('%a %H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}")
-            if len(upcoming) >= 3:
-                break
-        if not upcoming:
-            tg_send("DEBUG: aucun event à venir trouvé dans le XML.")
-        else:
-            tg_send("DEBUG: prochains events (heure telle que dans le feed)\n" + "\n".join(upcoming))
 
         # Alerte source cassée (pas à chaque run)
         if state["source_failures"] >= SOURCE_FAIL_ALERT_AFTER:
@@ -236,14 +222,26 @@ def main():
 
         save_state(state)
         return
-        
+
+    # ✅ DEBUG (uniquement si events existe, donc après un try réussi)
+    if os.environ.get("DEBUG_NEXT") == "1":
+        upcoming = []
+        for dt, ev in events:
+            if dt >= now:
+                upcoming.append(f"{dt.strftime('%a %H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}")
+            if len(upcoming) >= 5:
+                break
+
+        tg_send(
+            "DEBUG CALENDAR\n\n"
+            f"Now: {now.strftime('%a %H:%M')} (Paris)\n\n"
+            "Prochains événements:\n"
+            + ("\n".join(upcoming) if upcoming else "(aucun)")
+        )
+
     # 2) Résumé quotidien à 07:00 Paris (une seule fois)
     if today_key not in state["sent_daily"] and (now.hour == 7 and now.minute <= 5):
-        lines = [fmt_line(dt, ev) for dt, ev in events if dt.date() == now.date()]
-        if lines:
-            msg = "🗓️ Macro du jour (USD/EUR/GBP — Medium+High)\n" + "\n".join(lines)
-        else:
-            msg = "🗓️ Macro du jour\nAucun événement Medium/High (USD/EUR/GBP) aujourd’hui."
+        msg = format_daily_summary(now.date(), events)
         tg_send(msg)
         state["sent_daily"][today_key] = now.isoformat()
 
@@ -261,11 +259,6 @@ def main():
 
         msg = format_macro_alert(dt, ev, REMINDER_LEAD_MIN)
         tg_send(msg)
-
         state["sent_reminders"][key] = now.isoformat()
 
     save_state(state)
-
-
-if __name__ == "__main__":
-    main()
