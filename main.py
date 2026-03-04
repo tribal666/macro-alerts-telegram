@@ -261,7 +261,8 @@ def main():
         tg_send(msg)
         state["sent_reminders"][key] = now.isoformat()
 
-save_state(state)
-    
+    save_state(state)
+
+
 if __name__ == "__main__":
-        main()
+    main()
