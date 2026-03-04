@@ -195,6 +195,23 @@ def main():
     # 1) Récupération events avec fallback + monitoring
     try:
         events = fetch_events()
+
+            # DEBUG FORCÉ : envoie les 5 prochains events à chaque exécution manuelle
+    if os.environ.get("DEBUG_ALWAYS") == "1":
+        upcoming = []
+        for dt, ev in events:
+            if dt >= now:
+                upcoming.append(f"{dt.strftime('%a %H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}")
+            if len(upcoming) >= 5:
+                break
+
+        tg_send(
+            "DEBUG\n"
+            f"Now: {now.strftime('%a %H:%M')} (Paris)\n"
+            "Prochains events:\n" +
+            ("\n".join(upcoming) if upcoming else "(aucun)")
+        )
+        
         # reset failures si OK
         state["source_failures"] = 0
     except Exception as e:
