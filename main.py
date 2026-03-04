@@ -195,7 +195,29 @@ def main():
     # 1) Récupération events avec fallback + monitoring
     try:
         events = fetch_events()
-        
+        # DEBUG TEST : envoie les prochains événements
+if os.environ.get("DEBUG_ALWAYS") == "1":
+
+    upcoming = []
+
+    for dt, ev in events:
+        if dt >= now:
+            upcoming.append(
+                f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}"
+            )
+
+        if len(upcoming) >= 5:
+            break
+
+    if upcoming:
+        tg_send(
+            "DEBUG CALENDAR\n\n"
+            f"Now: {now.strftime('%H:%M')} (Paris)\n\n"
+            "Prochains événements:\n"
+            + "\n".join(upcoming)
+        )
+    else:
+        tg_send("DEBUG CALENDAR : aucun événement trouvé.")
         # reset failures si OK
         state["source_failures"] = 0
     except Exception as e:
