@@ -145,6 +145,19 @@ def main():
     except Exception as e:
         state["source_failures"] = int(state.get("source_failures", 0)) + 1
 
+            # DEBUG: sur exécution manuelle, envoyer les prochains events
+    if os.environ.get("DEBUG_NEXT") == "1":
+        upcoming = []
+        for dt, ev in events:
+            if dt >= now:
+                upcoming.append(f"{dt.strftime('%a %H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}")
+            if len(upcoming) >= 3:
+                break
+        if not upcoming:
+            tg_send("DEBUG: aucun event à venir trouvé dans le XML.")
+        else:
+            tg_send("DEBUG: prochains events (heure telle que dans le feed)\n" + "\n".join(upcoming))
+
         # Alerte source cassée (pas à chaque run)
         if state["source_failures"] >= SOURCE_FAIL_ALERT_AFTER:
             # évite spam: max 1 alerte toutes les 6h
