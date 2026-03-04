@@ -33,6 +33,7 @@ jobs:
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          DEBUG_ALWAYS: "1"
         run: |
           python main.py
 
