@@ -190,7 +190,6 @@ def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]
 def main():
     state = load_state()
     now = datetime.now(TZ)
-    tg_send(f"DEBUG START — Now {now.strftime('%Y-%m-%d %H:%M')} Paris")
     today_key = now.date().isoformat()
 
     # 1) Récupération events avec fallback + monitoring
@@ -224,7 +223,7 @@ def main():
         save_state(state)
         return
 
-    # ✅ DEBUG (uniquement si events existe, donc après un try réussi)
+    # DEBUG : seulement si le fetch a réussi (events existe)
     if os.environ.get("DEBUG_NEXT") == "1":
         upcoming = []
         for dt, ev in events:
