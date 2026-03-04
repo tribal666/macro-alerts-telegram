@@ -98,7 +98,8 @@ def parse_ff_datetime(date_str: str, time_str: str) -> datetime | None:
     except ValueError:
         return None
 
-    return datetime.combine(d, t).replace(tzinfo=TZ)
+   dt_utc = datetime.combine(d, t).replace(tzinfo=ZoneInfo("UTC"))
+return dt_utc.astimezone(TZ)
 
 
 def fetch_events() -> list[tuple[datetime, dict]]:
