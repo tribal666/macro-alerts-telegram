@@ -70,15 +70,7 @@ def fetch_ff_xml() -> str:
 
 
 def parse_ff_datetime(date_str: str, time_str: str) -> datetime | None:
-    """
-    FF XML typique:
-      date: "03-04-2026" (MM-DD-YYYY)
-      time: "10:00am" / "3:30pm"
-    On ignore All Day / Tentative / vide.
-    IMPORTANT: FF ne précise pas toujours explicitement la TZ dans ce flux.
-    Ici on traite l'heure comme "heure affichable" et on l'ancre en Europe/Paris
-    (ce qui est généralement ce que tu veux pour tes rappels).
-    """
+
     if not date_str or not time_str:
         return None
 
@@ -98,8 +90,8 @@ def parse_ff_datetime(date_str: str, time_str: str) -> datetime | None:
     except ValueError:
         return None
 
-   dt_utc = datetime.combine(d, t).replace(tzinfo=ZoneInfo("UTC"))
-return dt_utc.astimezone(TZ)
+    dt_utc = datetime.combine(d, t).replace(tzinfo=ZoneInfo("UTC"))
+    return dt_utc.astimezone(TZ)
 
 
 def fetch_events() -> list[tuple[datetime, dict]]:
