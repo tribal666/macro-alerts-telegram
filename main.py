@@ -190,6 +190,7 @@ def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]
 def main():
     state = load_state()
     now = datetime.now(TZ)
+    tg_send(f"DEBUG START — Now {now.strftime('%Y-%m-%d %H:%M')} Paris")
     today_key = now.date().isoformat()
 
     # 1) Récupération events avec fallback + monitoring
