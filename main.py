@@ -267,7 +267,7 @@ def main():
         state["sent_daily"][today_key] = now.isoformat()
 
     # 3) Rappels T-15 (fenêtre tolérance)
-    for dt, ev in events:
+for dt, ev in events:
     delta_min = (dt - now).total_seconds() / 60.0
 
     # rappel environ 15 min avant, avec tolérance large
