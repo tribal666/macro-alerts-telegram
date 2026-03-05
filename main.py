@@ -267,12 +267,12 @@ def main():
         state["sent_daily"][today_key] = now.isoformat()
 
     # 3) Rappels T-15 (fenêtre tolérance)
-    start = now + timedelta(minutes=REMINDER_LEAD_MIN)
-    end = start + timedelta(minutes=REMINDER_WINDOW_MIN)
-
     for dt, ev in events:
-        if not (start <= dt < end):
-            continue
+    delta_min = (dt - now).total_seconds() / 60.0
+
+    # rappel environ 15 min avant, avec tolérance large
+    if not (10 <= delta_min <= 20):
+        continue
 
         # ✅ Filtre final sur tes actifs
         if not is_relevant_event(ev):
