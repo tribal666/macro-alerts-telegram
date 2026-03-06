@@ -267,13 +267,19 @@ def main():
         tg_send(msg)
         state["sent_daily"][today_key] = now.isoformat()
 
-    # 3) Rappels T-15 (tolérance large, robuste aux retards GitHub Actions)
-    for dt, ev in events:
-        delta_min = (dt - now).total_seconds() / 60.0
-    
-        # rappel environ 15 min avant, avec tolérance large
-        if not (10 <= delta_min <= 20):
-            continue
+    # 3) Rappels T-15 robustes (anti-miss)
+for dt, ev in events:
+
+    # Filtre actifs suivis
+    if not is_relevant_event(ev):
+        continue
+
+    # moment théorique du rappel
+    reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
+
+    # envoyer si on est après T-15 mais avant la news
+    if not (reminder_time <= now < dt):
+        continue
 
         # ✅ Filtre final sur tes actifs
         if not is_relevant_event(ev):
