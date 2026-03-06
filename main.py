@@ -268,7 +268,7 @@ def main():
         state["sent_daily"][today_key] = now.isoformat()
 
     # 3) Rappels T-15 robustes (anti-miss)
-for dt, ev in events:
+    for dt, ev in events:
 
     # Filtre actifs suivis
     if not is_relevant_event(ev):
