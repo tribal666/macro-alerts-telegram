@@ -23,6 +23,19 @@ STATE_FILE = Path("state.json")
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
 ALLOWED_IMPACT = {"Medium", "High"}
 
+def is_allowed_event(ev):
+    impact = ev["impact"]
+    currency = ev["country"]
+
+    if impact == "High":
+        return True
+
+    if impact == "Medium" and currency == "USD":
+        return True
+
+    return False
+    
+
 # ✅ TES ACTIFS SUIVIS (filtrage final)
 WATCHED_ASSETS = {"EURUSD", "GBPUSD", "XAUUSD", "DE30"}
 
@@ -110,8 +123,9 @@ def fetch_events() -> list[tuple[datetime, dict]]:
 
         if country not in ALLOWED_CURRENCIES:
             continue
-        if impact not in ALLOWED_IMPACT:
+        if not is_allowed_event({"impact": impact, "country": country}):
             continue
+              
 
         dt = parse_ff_datetime(date_s, time_s)
         if dt is None:
