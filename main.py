@@ -22,6 +22,20 @@ STATE_FILE = Path("state.json")
 # Paramètres
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
 ALLOWED_IMPACT = {"Medium", "High"}
+def is_allowed_event(ev):
+    impact = ev["impact"]
+    currency = ev["country"]
+
+    # toujours autoriser HIGH
+    if impact == "High":
+        return True
+
+    # MEDIUM seulement pour USD
+    if impact == "Medium" and currency == "USD":
+        return True
+
+    return False
+    
 
 def is_allowed_event(ev):
     impact = ev["impact"]
