@@ -281,12 +281,12 @@ for dt, ev in events:
     if not (reminder_time <= now < dt):
         continue
 
-        # ✅ Filtre final sur tes actifs
-        if not is_relevant_event(ev):
+   # ✅ Filtre final sur tes actifs
+     if not is_relevant_event(ev):
             continue
 
         key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
-        if key in state["sent_reminders"]:
+     if key in state["sent_reminders"]:
             continue
 
         msg = format_macro_alert(dt, ev, REMINDER_LEAD_MIN)
