@@ -158,18 +158,24 @@ def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
     imp = ev["impact"].upper()
     title = ev["title"]
 
+    # Couleur selon impact
+    if imp == "HIGH":
+        impact_icon = "🔴 HIGH IMPACT"
+    else:
+        impact_icon = "🟠 MEDIUM IMPACT"
+
     assets = relevant_assets_for_event(ev)
     assets_block = "\n".join(f"• {a}" for a in assets) if assets else "• (aucun)"
 
     return (
-        "⚠️ MACRO ALERT\n\n"
+        f"{impact_icon}\n\n"
         f"⏰ Dans {lead_min} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
-        f"{flag_for_currency(cur)} {cur} — {imp}\n"
+        f"{flag_for_currency(cur)} {cur}\n"
         f"{title}\n\n"
         "Actifs concernés\n"
         f"{assets_block}"
     )
-
+    
 
 def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
     lines_by_cur = {"USD": [], "EUR": [], "GBP": []}
