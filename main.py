@@ -192,30 +192,37 @@ def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
     
 
 def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
-    lines_by_cur = {"USD": [], "EUR": [], "GBP": []}
+
+    events_by_asset = {a: [] for a in WATCHED_ASSETS}
 
     for dt, ev in events:
+
         if dt.date() != day:
             continue
+
         if not is_relevant_event(ev):
             continue
 
-        cur = ev["country"]
-        assets = ", ".join(relevant_assets_for_event(ev))
-        lines_by_cur[cur].append(f"{dt.strftime('%H:%M')} — [{ev['impact']}] {ev['title']}  ({assets})")
+        assets = relevant_assets_for_event(ev)
 
-    parts = ["🗓️ Macro du jour (Medium+High) — filtré sur tes actifs"]
+        for asset in assets:
+            events_by_asset[asset].append(
+                f"{dt.strftime('%H:%M')} — {ev['title']}"
+            )
 
-    for cur in ("EUR", "GBP", "USD"):
-        if lines_by_cur[cur]:
-            parts.append(f"\n{flag_for_currency(cur)} {cur}")
-            parts.extend(lines_by_cur[cur])
+    parts = ["🗓️ Macro du jour"]
+
+    for asset in sorted(events_by_asset.keys()):
+
+        if not events_by_asset[asset]:
+            continue
+
+        parts.append(f"\n{asset}")
+
+        parts.extend(events_by_asset[asset])
 
     if len(parts) == 1:
-        return (
-            "🗓️ Macro du jour\n"
-            "Aucun événement Medium/High pertinent aujourd’hui (sur EURUSD/GBPUSD/XAUUSD/DE30)."
-        )
+        return "🗓️ Macro du jour\nAucune annonce pertinente aujourd’hui."
 
     return "\n".join(parts)
 
