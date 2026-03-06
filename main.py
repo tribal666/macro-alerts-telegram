@@ -23,9 +23,6 @@ STATE_FILE = Path("state.json")
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
 ALLOWED_IMPACT = {"Medium", "High"}
 
-    impact = ev["impact"]
-    currency = ev["country"]
-
     # toujours autoriser HIGH
     if impact == "High":
         return True
