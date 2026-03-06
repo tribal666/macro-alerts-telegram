@@ -1,4 +1,3 @@
-
 import os
 import json
 import requests
@@ -28,7 +27,7 @@ ALLOWED_IMPACT = {"Medium", "High"}
 WATCHED_ASSETS = {"EURUSD", "GBPUSD", "XAUUSD", "DE30"}
 
 REMINDER_LEAD_MIN = 15
-REMINDER_WINDOW_MIN = 6          # tolérance, car GitHub Actions tourne toutes les 5 min
+REMINDER_WINDOW_MIN = 6          # tolérance, conservé pour compatibilité
 SOURCE_FAIL_ALERT_AFTER = 3      # nb d'échecs consécutifs avant alerte Telegram
 
 
@@ -36,10 +35,10 @@ def load_state() -> dict:
     if STATE_FILE.exists():
         return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     return {
-        "sent_daily": {},          # YYYY-MM-DD -> iso
-        "sent_reminders": {},      # key -> iso
-        "source_failures": 0,      # compteur échecs consécutifs
-        "last_source_alert": None  # iso date-time
+        "sent_daily": {},
+        "sent_reminders": {},
+        "source_failures": 0,
+        "last_source_alert": None
     }
 
 
@@ -104,8 +103,8 @@ def fetch_events() -> list[tuple[datetime, dict]]:
     events = []
     for ev in root.findall(".//event"):
         title = (ev.findtext("title") or "").strip()
-        country = (ev.findtext("country") or "").strip().upper()    # USD/EUR/GBP
-        impact = (ev.findtext("impact") or "").strip()              # Low/Medium/High
+        country = (ev.findtext("country") or "").strip().upper()
+        impact = (ev.findtext("impact") or "").strip()
         date_s = (ev.findtext("date") or "").strip()
         time_s = (ev.findtext("time") or "").strip()
 
@@ -131,8 +130,8 @@ def flag_for_currency(cur: str) -> str:
 def impacted_assets(currency: str) -> list[str]:
     """
     Mapping "trading" (simple et utile).
-    - USD impacte: EURUSD, GBPUSD, XAUUSD (et souvent indices globaux)
-    - EUR impacte: EURUSD + DE30 (proxy Europe/Allemagne)
+    - USD impacte: EURUSD, GBPUSD, XAUUSD
+    - EUR impacte: EURUSD + DE30
     - GBP impacte: GBPUSD
     """
     c = currency.upper()
@@ -146,7 +145,6 @@ def impacted_assets(currency: str) -> list[str]:
 
 
 def relevant_assets_for_event(ev: dict) -> list[str]:
-    """Intersection actifs impactés x actifs suivis."""
     assets = impacted_assets(ev["country"])
     return [a for a in assets if a in WATCHED_ASSETS]
 
@@ -174,10 +172,6 @@ def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
 
 
 def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
-    """
-    Résumé 07:00 : UNIQUEMENT les news du jour qui touchent tes actifs suivis.
-    Regroupe par devise, garde l’ordre chronologique.
-    """
     lines_by_cur = {"USD": [], "EUR": [], "GBP": []}
 
     for dt, ev in events:
@@ -218,15 +212,12 @@ def main():
     except Exception as e:
         state["source_failures"] = int(state.get("source_failures", 0)) + 1
 
-        # Alerte source cassée (pas à chaque run)
         if state["source_failures"] >= SOURCE_FAIL_ALERT_AFTER:
-            # évite spam: max 1 alerte toutes les 6h
             last = state.get("last_source_alert")
             allow = True
             if last:
                 try:
                     last_dt = datetime.fromisoformat(last)
-                    # last_dt est déjà ISO; on force TZ Paris si absent
                     if last_dt.tzinfo is None:
                         last_dt = last_dt.replace(tzinfo=TZ)
                     if (now - last_dt) < timedelta(hours=6):
@@ -245,7 +236,7 @@ def main():
         save_state(state)
         return
 
-    # DEBUG : seulement si le fetch a réussi (events existe)
+    # DEBUG : seulement si le fetch a réussi
     if os.environ.get("DEBUG_NEXT") == "1":
         upcoming = []
         for dt, ev in events:
@@ -269,24 +260,17 @@ def main():
 
     # 3) Rappels T-15 robustes (anti-miss)
     for dt, ev in events:
+        if not is_relevant_event(ev):
+            continue
 
-    # Filtre actifs suivis
-    if not is_relevant_event(ev):
-        continue
+        reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
 
-    # moment théorique du rappel
-    reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
-
-    # envoyer si on est après T-15 mais avant la news
-    if not (reminder_time <= now < dt):
-        continue
-
-    # ✅ Filtre final sur tes actifs
-    if not is_relevant_event(ev):
+        # envoyer si on est après T-15 mais avant la news
+        if not (reminder_time <= now < dt):
             continue
 
         key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
-    if key in state["sent_reminders"]:
+        if key in state["sent_reminders"]:
             continue
 
         msg = format_macro_alert(dt, ev, REMINDER_LEAD_MIN)
