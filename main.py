@@ -22,7 +22,7 @@ STATE_FILE = Path("state.json")
 # Paramètres
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
 ALLOWED_IMPACT = {"Medium", "High"}
-def is_allowed_event(ev):
+
     impact = ev["impact"]
     currency = ev["country"]
 
