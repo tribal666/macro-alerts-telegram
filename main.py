@@ -210,7 +210,7 @@ def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]
                 f"{dt.strftime('%H:%M')} — {ev['title']}"
             )
 
-    parts = ["🗓️ Macro du jour"]
+    parts = [f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}"]
 
     for asset in sorted(events_by_asset.keys()):
 
@@ -222,7 +222,7 @@ def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]
         parts.extend(events_by_asset[asset])
 
     if len(parts) == 1:
-        return "🗓️ Macro du jour\nAucune annonce pertinente aujourd’hui."
+        return f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}\nAucune annonce pertinente."
 
     return "\n".join(parts)
 
