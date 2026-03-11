@@ -279,11 +279,15 @@ def main():
             + ("\n".join(upcoming) if upcoming else "(aucun)")
         )
 
-    # 2) Résumé quotidien à 07:00 Paris (une seule fois)
-    if today_key not in state["sent_daily"] and (now.hour == 7 and now.minute <= 5):
-        msg = format_daily_summary(now.date(), events)
+    # 2) Résumé à 22:00 Paris pour le lendemain
+    tomorrow = (now + timedelta(days=1)).date()
+    tomorrow_key = tomorrow.isoformat()
+
+    if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 5):
+        title = f"🗓️ Macro de demain — {tomorrow.strftime('%d/%m/%Y')}"
+        msg = format_daily_summary(tomorrow, events, title)
         tg_send(msg)
-        state["sent_daily"][today_key] = now.isoformat()
+        state["sent_daily"][tomorrow_key] = now.isoformat()
 
     # 3) Rappels T-15 robustes (anti-miss)
     for dt, ev in events:
