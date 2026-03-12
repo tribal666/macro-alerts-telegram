@@ -2,7 +2,9 @@ name: Macro News
 
 on:
   workflow_dispatch:
-
+  schedule:
+    - cron: "*/5 * * * *"
+    
 concurrency:
   group: macro-news
   cancel-in-progress: false
