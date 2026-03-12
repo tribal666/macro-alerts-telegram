@@ -283,9 +283,9 @@ def main():
     tomorrow = (now + timedelta(days=1)).date()
     tomorrow_key = tomorrow.isoformat()
 
-    if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 5):
+    if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 15):
         title = f"🗓️ Macro de demain — {tomorrow.strftime('%d/%m/%Y')}"
-        msg = format_daily_summary(tomorrow, events, title)
+        msg = format_daily_summary(tomorrow, events)
         tg_send(msg)
         state["sent_daily"][tomorrow_key] = now.isoformat()
 
