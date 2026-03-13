@@ -279,15 +279,15 @@ except Exception as e:
         save_state(state)
         return
 
-    # 2) Résumé à 22:00 Paris pour le lendemain
-    tomorrow = (now + timedelta(days=1)).date()
-    tomorrow_key = tomorrow.isoformat()
+# 2) Résumé à 22:00 Paris pour le lendemain
+tomorrow = (now + timedelta(days=1)).date()
+tomorrow_key = tomorrow.isoformat()
 
-    if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 15):
-        title = f"🗓️ Macro de demain — {tomorrow.strftime('%d/%m/%Y')}"
-        msg = format_daily_summary(tomorrow, events)
-        tg_send(msg)
-        state["sent_daily"][tomorrow_key] = now.isoformat()
+if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 15):
+    title = f"🗓️ Macro de demain — {tomorrow.strftime('%d/%m/%Y')}"
+    msg = format_daily_summary(tomorrow, events)
+    tg_send(msg)
+    state["sent_daily"][tomorrow_key] = now.isoformat()
 
     # 3) Rappels T-15 robustes (anti-miss)
     for dt, ev in events:
