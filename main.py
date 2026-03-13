@@ -252,7 +252,7 @@ try:
 
     state["seen_events"] = list(seen)
     state["source_failures"] = 0
-    except Exception as e:
+except Exception as e:
         state["source_failures"] = int(state.get("source_failures", 0)) + 1
 
         if state["source_failures"] >= SOURCE_FAIL_ALERT_AFTER:
