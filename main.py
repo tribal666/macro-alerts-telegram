@@ -191,39 +191,38 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     
 
 def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
+    header = f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}\n\n"
 
-    events_by_asset = {a: [] for a in WATCHED_ASSETS}
+    high_events = []
+    other_events = []
 
-    for dt, ev in events:
-
-        if dt.date() != day:
-            continue
-
-        if not is_relevant_event(ev):
-            continue
+    for dt_local, ev in sorted(events, key=lambda x: x[0]):
+        cur = ev["country"]
+        imp = ev["impact"].upper()
+        title = ev["title"]
 
         assets = relevant_assets_for_event(ev)
+        assets_str = ", ".join(assets) if assets else "-"
 
-        for asset in assets:
-            events_by_asset[asset].append(
-                f"{dt.strftime('%H:%M')} — {ev['title']}"
-            )
+        line = f"{dt_local.strftime('%H:%M')} {cur} {title} ({assets_str})"
 
-    parts = [f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}"]
+        if imp == "HIGH":
+            high_events.append(line)
+        else:
+            other_events.append(line)
 
-    for asset in sorted(events_by_asset.keys()):
+    msg = header
 
-        if not events_by_asset[asset]:
-            continue
+    if high_events:
+        msg += "🚨 HIGH IMPACT\n"
+        msg += "\n".join(high_events)
+        msg += "\n\n"
 
-        parts.append(f"\n{asset}")
+    if other_events:
+        msg += "📊 AUTRES ANNONCES\n"
+        msg += "\n".join(other_events)
 
-        parts.extend(events_by_asset[asset])
-
-    if len(parts) == 1:
-        return f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}\nAucune annonce pertinente."
-
-    return "\n".join(parts)
+    return msg
 
 
 def main():
