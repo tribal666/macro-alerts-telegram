@@ -279,22 +279,6 @@ except Exception as e:
         save_state(state)
         return
 
-    # DEBUG : seulement si le fetch a réussi
-    if os.environ.get("DEBUG_NEXT") == "1":
-        upcoming = []
-        for dt, ev in events:
-            if dt >= now:
-                upcoming.append(f"{dt.strftime('%a %H:%M')} — [{ev['impact']}] {ev['country']} — {ev['title']}")
-            if len(upcoming) >= 5:
-                break
-
-        tg_send(
-            "DEBUG CALENDAR\n\n"
-            f"Now: {now.strftime('%a %H:%M')} (Paris)\n\n"
-            "Prochains événements:\n"
-            + ("\n".join(upcoming) if upcoming else "(aucun)")
-        )
-
     # 2) Résumé à 22:00 Paris pour le lendemain
     tomorrow = (now + timedelta(days=1)).date()
     tomorrow_key = tomorrow.isoformat()
