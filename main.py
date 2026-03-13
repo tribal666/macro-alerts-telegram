@@ -167,12 +167,11 @@ def is_relevant_event(ev: dict) -> bool:
     return len(relevant_assets_for_event(ev)) > 0
 
 
-def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
+def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     cur = ev["country"]
     imp = ev["impact"].upper()
     title = ev["title"]
 
-    # Couleur selon impact
     if imp == "HIGH":
         impact_icon = "🔴 HIGH IMPACT"
     else:
@@ -183,7 +182,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, lead_min: int) -> str:
 
     return (
         f"{impact_icon}\n\n"
-        f"⏰ Dans {lead_min} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
+        f"⏰ Dans {minutes_left} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
         f"{flag_for_currency(cur)} {cur}\n"
         f"{title}\n\n"
         "Actifs concernés\n"
@@ -304,7 +303,8 @@ def main():
         if key in state["sent_reminders"]:
             continue
 
-        msg = format_macro_alert(dt, ev, REMINDER_LEAD_MIN)
+        minutes_left = max(0, int((dt - now).total_seconds() / 60))
+        msg = format_macro_alert(dt, ev, minutes_left)
         tg_send(msg)
         state["sent_reminders"][key] = now.isoformat()
 
