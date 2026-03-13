@@ -21,7 +21,8 @@ STATE_FILE = Path("state.json")
 
 # Paramètres
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
-ALLOWED_IMPACT = {"Medium", "High"}  
+ALLOWED_IMPACT = {"Medium", "High"}
+
 
 def is_allowed_event(ev):
     impact = ev["impact"]
@@ -34,7 +35,7 @@ def is_allowed_event(ev):
         return True
 
     return False
-    
+
 
 # ✅ TES ACTIFS SUIVIS (filtrage final)
 WATCHED_ASSETS = {"EURUSD", "GBPUSD", "XAUUSD", "DE30"}
@@ -50,8 +51,9 @@ def load_state() -> dict:
     return {
         "sent_daily": {},
         "sent_reminders": {},
+        "seen_events": [],
         "source_failures": 0,
-        "last_source_alert": None
+        "last_source_alert": None,
     }
 
 
@@ -61,11 +63,15 @@ def save_state(state: dict) -> None:
 
 def tg_send(text: str) -> None:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    r = requests.post(url, json={
-        "chat_id": CHAT_ID,
-        "text": text,
-        "disable_web_page_preview": True
-    }, timeout=20)
+    r = requests.post(
+        url,
+        json={
+            "chat_id": CHAT_ID,
+            "text": text,
+            "disable_web_page_preview": True,
+        },
+        timeout=20,
+    )
     r.raise_for_status()
 
 
@@ -125,7 +131,6 @@ def fetch_events() -> list[tuple[datetime, dict]]:
             continue
         if not is_allowed_event({"impact": impact, "country": country}):
             continue
-              
 
         dt = parse_ff_datetime(date_s, time_s)
         if dt is None:
@@ -188,7 +193,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         "Actifs concernés\n"
         f"{assets_block}"
     )
-    
+
 
 def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
     header = f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}\n\n"
@@ -197,6 +202,9 @@ def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]
     other_events = []
 
     for dt_local, ev in sorted(events, key=lambda x: x[0]):
+        if dt_local.date() != day:
+            continue
+
         cur = ev["country"]
         imp = ev["impact"].upper()
         title = ev["title"]
@@ -222,37 +230,39 @@ def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]
         msg += "📊 AUTRES ANNONCES\n"
         msg += "\n".join(other_events)
 
+    if not high_events and not other_events:
+        msg += "Aucune annonce pertinente."
+
     return msg
 
 
 def main():
     state = load_state()
     now = datetime.now(TZ)
-    today_key = now.date().isoformat()
 
     # 1) Récupération events avec fallback + monitoring
-try:
-    events = fetch_events()
+    try:
+        events = fetch_events()
 
-    # Détection nouvelles annonces
-    seen = set(state.get("seen_events", []))
+        # Détection nouvelles annonces
+        seen = set(state.get("seen_events", []))
+        for dt, ev in events:
+            key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
 
-    for dt, ev in events:
-        key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+            if key not in seen:
+                msg = (
+                    "⚡ NOUVELLE NEWS MACRO\n\n"
+                    f"{flag_for_currency(ev['country'])} {ev['country']}\n"
+                    f"{ev['title']}\n\n"
+                    f"🕒 {dt.strftime('%H:%M')} (Paris)"
+                )
+                tg_send(msg)
+                seen.add(key)
 
-        if key not in seen:
-            msg = (
-                "⚡ NOUVELLE NEWS MACRO\n\n"
-                f"{flag_for_currency(ev['country'])} {ev['country']}\n"
-                f"{ev['title']}\n\n"
-                f"🕒 {dt.strftime('%H:%M')} (Paris)"
-            )
-            tg_send(msg)
-            seen.add(key)
+        state["seen_events"] = list(seen)
+        state["source_failures"] = 0
 
-    state["seen_events"] = list(seen)
-    state["source_failures"] = 0
-except Exception as e:
+    except Exception as e:
         state["source_failures"] = int(state.get("source_failures", 0)) + 1
 
         if state["source_failures"] >= SOURCE_FAIL_ALERT_AFTER:
@@ -279,15 +289,15 @@ except Exception as e:
         save_state(state)
         return
 
-# 2) Résumé à 22:00 Paris pour le lendemain
-tomorrow = (now + timedelta(days=1)).date()
-tomorrow_key = tomorrow.isoformat()
+    # 2) Résumé à 22:00 Paris pour le lendemain
+    tomorrow = (now + timedelta(days=1)).date()
+    tomorrow_key = tomorrow.isoformat()
 
-if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 15):
-    title = f"🗓️ Macro de demain — {tomorrow.strftime('%d/%m/%Y')}"
-    msg = format_daily_summary(tomorrow, events)
-    tg_send(msg)
-    state["sent_daily"][tomorrow_key] = now.isoformat()
+    if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 15):
+        tomorrow_events = [(dt, ev) for dt, ev in events if dt.date() == tomorrow]
+        msg = format_daily_summary(tomorrow, tomorrow_events)
+        tg_send(msg)
+        state["sent_daily"][tomorrow_key] = now.isoformat()
 
     # 3) Rappels T-15 robustes (anti-miss)
     for dt, ev in events:
