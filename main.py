@@ -233,6 +233,26 @@ def main():
     # 1) Récupération events avec fallback + monitoring
     try:
         events = fetch_events()
+        # Détection nouvelles annonces
+        seen = set(state.get("seen_events", []))
+
+        for dt, ev in events:
+            key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+
+        if key not in seen:
+           msg = (
+            "⚡ NOUVELLE NEWS MACRO\n\n"
+            f"{flag_for_currency(ev['country'])} {ev['country']}\n"
+            f"{ev['title']}\n\n"
+            f"🕒 {dt.strftime('%H:%M')} (Paris)"
+        )
+        tg_send(msg)
+
+        seen.add(key)
+
+        state["seen_events"] = list(seen)
+        
+        
         state["source_failures"] = 0
     except Exception as e:
         state["source_failures"] = int(state.get("source_failures", 0)) + 1
