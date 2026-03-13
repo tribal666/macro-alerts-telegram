@@ -173,7 +173,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     title = ev["title"]
 
     if imp == "HIGH":
-        impact_icon = "🔴 HIGH IMPACT"
+        impact_icon = "🚨🚨🚨 HIGH IMPACT 🚨🚨🚨"
     else:
         impact_icon = "🟠 MEDIUM IMPACT"
 
