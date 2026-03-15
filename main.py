@@ -248,7 +248,10 @@ def main():
         seen = set(state.get("seen_events", []))
         for dt, ev in events:
             key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
-
+            # ignore les événements trop lointains (ex : semaine complète dimanche)
+            if (dt - now).days > 1:
+                continue
+            
             if key not in seen:
                 msg = (
                     "⚡ NOUVELLE NEWS MACRO\n\n"
