@@ -126,6 +126,10 @@ def fetch_events() -> list[tuple[datetime, dict]]:
         impact = (ev.findtext("impact") or "").strip()
         date_s = (ev.findtext("date") or "").strip()
         time_s = (ev.findtext("time") or "").strip()
+        forecast = (ev.findtext("forecast") or "").strip()
+        previous = (ev.findtext("previous") or "").strip()
+        actual = (ev.findtext("actual") or "").strip()
+
 
         if country not in ALLOWED_CURRENCIES:
             continue
@@ -136,7 +140,14 @@ def fetch_events() -> list[tuple[datetime, dict]]:
         if dt is None:
             continue
 
-        events.append((dt, {"title": title, "country": country, "impact": impact}))
+        events.append((dt, {
+            "title": title,
+            "country": country,
+            "impact": impact,
+            "forecast": forecast,
+            "previous": previous,
+            "actual": actual,
+        }))
 
     events.sort(key=lambda x: x[0])
     return events
