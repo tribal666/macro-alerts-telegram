@@ -257,6 +257,7 @@ def main():
                     "⚡ NOUVELLE NEWS MACRO\n\n"
                     f"{flag_for_currency(ev['country'])} {ev['country']}\n"
                     f"{ev['title']}\n\n"
+                    f"📅 {dt.strftime('%d/%m')}\n"
                     f"🕒 {dt.strftime('%H:%M')} (Paris)"
                 )
                 tg_send(msg)
