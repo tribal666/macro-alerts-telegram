@@ -44,13 +44,7 @@ REMINDER_LEAD_MIN = 15
 REMINDER_WINDOW_MIN = 6  # tolérance, conservé pour compatibilité
 SOURCE_FAIL_ALERT_AFTER = 3  # nb d'échecs consécutifs avant alerte Telegram
 
-CRITICAL_KEYWORDS = [
-    "speaks",
-    "speech",
-    "press conference",
-    "testifies",
-    "hearing"
-]
+CRITICAL_KEYWORDS = ["speaks", "speech", "press conference", "testifies", "hearing"]
 
 MACRO_EXPLAIN = {
     "CPI": "Indice des prix à la consommation. Mesure l'inflation.",
@@ -77,9 +71,11 @@ def load_state() -> dict:
         "last_source_alert": None,
     }
 
+
 def is_critical_event(title: str) -> bool:
     t = title.lower()
     return any(k in t for k in CRITICAL_KEYWORDS)
+
 
 def save_state(state: dict) -> None:
     STATE_FILE.write_text(
@@ -238,6 +234,8 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
             impact_icon = "🔥🔥🔥 DISCOURS MAJEUR 🔥🔥🔥"
         else:
             impact_icon = "🚨🚨🚨 HIGH IMPACT 🚨🚨🚨"
+    else:
+        impact_icon = "🟠 MEDIUM IMPACT"
 
     assets = relevant_assets_for_event(ev)
     assets_block = "\n".join(f"• {a}" for a in assets) if assets else "• (aucun)"
@@ -252,7 +250,8 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         "Actifs concernés\n"
         f"{assets_block}"
     )
-    
+
+
 def format_release_alert(dt_local: datetime, ev: dict) -> str:
     cur = ev["country"]
     title = ev["title"]
@@ -293,6 +292,7 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
         f"{impact}\n\n"
         f"🕒 {dt_local.strftime('%H:%M')} (Paris)"
     )
+
 
 def format_daily_summary(
     day: datetime.date, events: list[tuple[datetime, dict]]
@@ -407,29 +407,29 @@ def main():
         state["sent_daily"][tomorrow_key] = now.isoformat()
 
     # 3) Rappels T-15 robustes (anti-miss)
-for dt, ev in events:
+    for dt, ev in events:
 
-    reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
+        reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
 
-    key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
+        key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
 
-    # ----- REMINDER -----
-    if reminder_time <= now < dt:
-        if key not in state["sent_reminders"]:
+        # ----- REMINDER -----
+        if reminder_time <= now < dt:
+            if key not in state["sent_reminders"]:
             minutes_left = max(0, int((dt - now).total_seconds() / 60))
             msg = format_macro_alert(dt, ev, minutes_left)
             tg_send(msg)
             state["sent_reminders"][key] = now.isoformat()
 
-    # ----- RELEASE -----
-    key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+        # ----- RELEASE -----
+        key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
 
-    if ev.get("actual") and key_release not in state["sent_releases"]:
-        msg = format_release_alert(dt, ev)
-        tg_send(msg)
-        state["sent_releases"][key_release] = now.isoformat()
+        if ev.get("actual") and key_release not in state["sent_releases"]:
+            msg = format_release_alert(dt, ev)
+            tg_send(msg)
+            state["sent_releases"][key_release] = now.isoformat()
 
-save_state(state)
+    save_state(state)
 
 
 if __name__ == "__main__":
