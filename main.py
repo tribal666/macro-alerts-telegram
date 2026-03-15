@@ -44,6 +44,14 @@ REMINDER_LEAD_MIN = 15
 REMINDER_WINDOW_MIN = 6  # tolérance, conservé pour compatibilité
 SOURCE_FAIL_ALERT_AFTER = 3  # nb d'échecs consécutifs avant alerte Telegram
 
+CRITICAL_KEYWORDS = [
+    "speaks",
+    "speech",
+    "press conference",
+    "testifies",
+    "hearing"
+]
+
 MACRO_EXPLAIN = {
     "CPI": "Indice des prix à la consommation. Mesure l'inflation.",
     "Core CPI": "Inflation hors alimentation et énergie.",
@@ -69,6 +77,9 @@ def load_state() -> dict:
         "last_source_alert": None,
     }
 
+def is_critical_event(title: str) -> bool:
+    t = title.lower()
+    return any(k in t for k in CRITICAL_KEYWORDS)
 
 def save_state(state: dict) -> None:
     STATE_FILE.write_text(
@@ -223,9 +234,10 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         values += f"\n📊 Précédent : {previous}"
 
     if imp == "HIGH":
-        impact_icon = "🚨🚨🚨 HIGH IMPACT 🚨🚨🚨"
-    else:
-        impact_icon = "🟠 MEDIUM IMPACT"
+        if is_critical_event(title):
+            impact_icon = "🔥🔥🔥 DISCOURS MAJEUR 🔥🔥🔥"
+        else:
+            impact_icon = "🚨🚨🚨 HIGH IMPACT 🚨🚨🚨"
 
     assets = relevant_assets_for_event(ev)
     assets_block = "\n".join(f"• {a}" for a in assets) if assets else "• (aucun)"
