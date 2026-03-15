@@ -199,7 +199,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     cur = ev["country"]
     imp = ev["impact"].upper()
     title = ev["title"]
-    
+
     forecast = ev.get("forecast")
     previous = ev.get("previous")
 
@@ -210,12 +210,10 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
             break
 
     values = ""
-
     if forecast:
-    values += f"\n📊 Prévision : {forecast}"
-
+        values += f"\n📊 Prévision : {forecast}"
     if previous:
-    values += f"\n📊 Précédent : {previous}"    
+        values += f"\n📊 Précédent : {previous}"
 
     if imp == "HIGH":
         impact_icon = "🚨🚨🚨 HIGH IMPACT 🚨🚨🚨"
@@ -230,7 +228,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         f"⏰ Dans {minutes_left} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
         f"{flag_for_currency(cur)} {cur}\n"
         f"{title}\n"
-        f"{explain}\n"
+        f"{explain}"
         f"{values}\n\n"
         "Actifs concernés\n"
         f"{assets_block}"
