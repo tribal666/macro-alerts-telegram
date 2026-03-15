@@ -409,9 +409,6 @@ def main():
     # 3) Rappels T-15 robustes (anti-miss)
 for dt, ev in events:
 
-    if not is_relevant_event(ev):
-        continue
-
     reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
 
     key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
