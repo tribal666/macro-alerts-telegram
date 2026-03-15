@@ -44,6 +44,18 @@ REMINDER_LEAD_MIN = 15
 REMINDER_WINDOW_MIN = 6          # tolérance, conservé pour compatibilité
 SOURCE_FAIL_ALERT_AFTER = 3      # nb d'échecs consécutifs avant alerte Telegram
 
+MACRO_EXPLAIN = {
+    "CPI": "Indice des prix à la consommation. Mesure l'inflation.",
+    "Core CPI": "Inflation hors alimentation et énergie.",
+    "PPI": "Indice des prix à la production.",
+    "GDP": "Produit intérieur brut, mesure la croissance économique.",
+    "Retail Sales": "Mesure les ventes au détail, indicateur clé de la consommation.",
+    "Non-Farm Payrolls": "Variation mensuelle de l'emploi aux États-Unis.",
+    "Unemployment": "Taux de chômage.",
+    "Interest Rate": "Décision de politique monétaire.",
+    "FOMC": "Décision de politique monétaire de la Réserve fédérale.",
+}
+
 
 def load_state() -> dict:
     if STATE_FILE.exists():
@@ -187,6 +199,23 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     cur = ev["country"]
     imp = ev["impact"].upper()
     title = ev["title"]
+    
+    forecast = ev.get("forecast")
+    previous = ev.get("previous")
+
+    explain = ""
+    for key in MACRO_EXPLAIN:
+        if key.lower() in title.lower():
+            explain = MACRO_EXPLAIN[key]
+            break
+
+    values = ""
+
+    if forecast:
+    values += f"\n📊 Prévision : {forecast}"
+
+    if previous:
+    values += f"\n📊 Précédent : {previous}"    
 
     if imp == "HIGH":
         impact_icon = "🚨🚨🚨 HIGH IMPACT 🚨🚨🚨"
@@ -200,7 +229,9 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         f"{impact_icon}\n\n"
         f"⏰ Dans {minutes_left} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
         f"{flag_for_currency(cur)} {cur}\n"
-        f"{title}\n\n"
+        f"{title}\n"
+        f"{explain}\n"
+        f"{values}\n\n"
         "Actifs concernés\n"
         f"{assets_block}"
     )
