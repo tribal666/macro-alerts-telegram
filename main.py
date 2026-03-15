@@ -240,8 +240,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         "Actifs concernés\n"
         f"{assets_block}"
     )
-
-
+    
 def format_release_alert(dt_local: datetime, ev: dict) -> str:
     cur = ev["country"]
     title = ev["title"]
@@ -250,16 +249,38 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
     forecast = ev.get("forecast")
     previous = ev.get("previous")
 
+    surprise = ""
+    impact = ""
+
+    try:
+        if actual and forecast:
+            a = float(actual.replace("%", "").replace("K", ""))
+            f = float(forecast.replace("%", "").replace("K", ""))
+            diff = a - f
+
+            surprise = f"\n⚡ Surprise : {diff:+}"
+
+            if diff > 0:
+                impact = f"📈 Impact probable : {cur} bullish"
+            elif diff < 0:
+                impact = f"📉 Impact probable : {cur} bearish"
+            else:
+                impact = "➖ Impact probable : neutre"
+
+    except Exception:
+        pass
+
     return (
         "🚨 DONNÉE MACRO PUBLIÉE\n\n"
         f"{flag_for_currency(cur)} {cur}\n"
         f"{title}\n\n"
         f"Actual : {actual}\n"
         f"Forecast : {forecast}\n"
-        f"Previous : {previous}\n\n"
+        f"Previous : {previous}"
+        f"{surprise}\n\n"
+        f"{impact}\n\n"
         f"🕒 {dt_local.strftime('%H:%M')} (Paris)"
     )
-
 
 def format_daily_summary(
     day: datetime.date, events: list[tuple[datetime, dict]]
