@@ -393,7 +393,7 @@ def main():
         state["sent_reminders"][key] = now.isoformat()
         
         # Détection publication de la donnée
-         key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+        key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
 
         if ev.get("actual") and key_release not in state["sent_releases"]:
             msg = format_release_alert(dt, ev)
