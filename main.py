@@ -41,8 +41,8 @@ def is_allowed_event(ev):
 WATCHED_ASSETS = {"EURUSD", "GBPUSD", "XAUUSD", "DE30"}
 
 REMINDER_LEAD_MIN = 15
-REMINDER_WINDOW_MIN = 6          # tolérance, conservé pour compatibilité
-SOURCE_FAIL_ALERT_AFTER = 3      # nb d'échecs consécutifs avant alerte Telegram
+REMINDER_WINDOW_MIN = 6  # tolérance, conservé pour compatibilité
+SOURCE_FAIL_ALERT_AFTER = 3  # nb d'échecs consécutifs avant alerte Telegram
 
 MACRO_EXPLAIN = {
     "CPI": "Indice des prix à la consommation. Mesure l'inflation.",
@@ -61,16 +61,19 @@ def load_state() -> dict:
     if STATE_FILE.exists():
         return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     return {
-        "sent_daily": {},
         "sent_reminders": {},
+        "sent_daily": {},
         "seen_events": [],
-        "source_failures": 0,
+        "sent_releases": {},
+        "source_failures": 0
         "last_source_alert": None,
     }
 
 
 def save_state(state: dict) -> None:
-    STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    STATE_FILE.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def tg_send(text: str) -> None:
@@ -142,7 +145,6 @@ def fetch_events() -> list[tuple[datetime, dict]]:
         previous = (ev.findtext("previous") or "").strip()
         actual = (ev.findtext("actual") or "").strip()
 
-
         if country not in ALLOWED_CURRENCIES:
             continue
         if not is_allowed_event({"impact": impact, "country": country}):
@@ -152,14 +154,19 @@ def fetch_events() -> list[tuple[datetime, dict]]:
         if dt is None:
             continue
 
-        events.append((dt, {
-            "title": title,
-            "country": country,
-            "impact": impact,
-            "forecast": forecast,
-            "previous": previous,
-            "actual": actual,
-        }))
+        events.append(
+            (
+                dt,
+                {
+                    "title": title,
+                    "country": country,
+                    "impact": impact,
+                    "forecast": forecast,
+                    "previous": previous,
+                    "actual": actual,
+                },
+            )
+        )
 
     events.sort(key=lambda x: x[0])
     return events
@@ -233,9 +240,29 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         "Actifs concernés\n"
         f"{assets_block}"
     )
+    
+def format_release_alert(dt_local: datetime, ev: dict) -> str:
+    cur = ev["country"]
+    title = ev["title"]
+
+    actual = ev.get("actual")
+    forecast = ev.get("forecast")
+    previous = ev.get("previous")
+
+    return (
+        "🚨 DONNÉE MACRO PUBLIÉE\n\n"
+        f"{flag_for_currency(cur)} {cur}\n"
+        f"{title}\n\n"
+        f"Actual : {actual}\n"
+        f"Forecast : {forecast}\n"
+        f"Previous : {previous}\n\n"
+        f"🕒 {dt_local.strftime('%H:%M')} (Paris)"
+    )
 
 
-def format_daily_summary(day: datetime.date, events: list[tuple[datetime, dict]]) -> str:
+def format_daily_summary(
+    day: datetime.date, events: list[tuple[datetime, dict]]
+) -> str:
     header = f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}\n\n"
 
     high_events = []
@@ -291,7 +318,7 @@ def main():
             # ignore les événements trop lointains (ex : semaine complète dimanche)
             if (dt - now).days > 1:
                 continue
-            
+
             if key not in seen:
                 msg = (
                     "⚡ NOUVELLE NEWS MACRO\n\n"
@@ -337,7 +364,9 @@ def main():
     tomorrow = (now + timedelta(days=1)).date()
     tomorrow_key = tomorrow.isoformat()
 
-    if tomorrow_key not in state["sent_daily"] and (now.hour == 22 and now.minute <= 15):
+    if tomorrow_key not in state["sent_daily"] and (
+        now.hour == 22 and now.minute <= 15
+    ):
         tomorrow_events = [(dt, ev) for dt, ev in events if dt.date() == tomorrow]
         msg = format_daily_summary(tomorrow, tomorrow_events)
         tg_send(msg)
@@ -362,9 +391,16 @@ def main():
         msg = format_macro_alert(dt, ev, minutes_left)
         tg_send(msg)
         state["sent_reminders"][key] = now.isoformat()
+        
+        # Détection publication de la donnée
+         key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+
+        if ev.get("actual") and key_release not in state["sent_releases"]:
+            msg = format_release_alert(dt, ev)
+            tg_send(msg)
+            state["sent_releases"][key_release] = now.isoformat()
 
     save_state(state)
-
 
 if __name__ == "__main__":
     main()
