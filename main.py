@@ -407,34 +407,32 @@ def main():
         state["sent_daily"][tomorrow_key] = now.isoformat()
 
     # 3) Rappels T-15 robustes (anti-miss)
-    for dt, ev in events:
-        if not is_relevant_event(ev):
-            continue
+for dt, ev in events:
 
-        reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
+    if not is_relevant_event(ev):
+        continue
 
-        # envoyer si on est après T-15 mais avant la news
-        if not (reminder_time <= now < dt):
-            continue
+    reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
 
-        key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
-        if key in state["sent_reminders"]:
-            continue
+    key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
 
-        minutes_left = max(0, int((dt - now).total_seconds() / 60))
-        msg = format_macro_alert(dt, ev, minutes_left)
-        tg_send(msg)
-        state["sent_reminders"][key] = now.isoformat()
-
-        # Détection publication de la donnée
-        key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
-
-        if ev.get("actual") and key_release not in state["sent_releases"]:
-            msg = format_release_alert(dt, ev)
+    # ----- REMINDER -----
+    if reminder_time <= now < dt:
+        if key not in state["sent_reminders"]:
+            minutes_left = max(0, int((dt - now).total_seconds() / 60))
+            msg = format_macro_alert(dt, ev, minutes_left)
             tg_send(msg)
-            state["sent_releases"][key_release] = now.isoformat()
+            state["sent_reminders"][key] = now.isoformat()
 
-    save_state(state)
+    # ----- RELEASE -----
+    key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+
+    if ev.get("actual") and key_release not in state["sent_releases"]:
+        msg = format_release_alert(dt, ev)
+        tg_send(msg)
+        state["sent_releases"][key_release] = now.isoformat()
+
+save_state(state)
 
 
 if __name__ == "__main__":
