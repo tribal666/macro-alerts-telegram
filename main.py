@@ -244,7 +244,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         f"{impact_icon}\n\n"
         f"⏰ Dans {minutes_left} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
         f"{flag_for_currency(cur)} {cur}\n"
-        f"{title}\n"
+        f"{title}\n\n"
         f"{explain}"
         f"{values}\n\n"
         "Actifs concernés\n"
