@@ -51,7 +51,8 @@ jobs:
               echo "No changes to commit"
             else
               git commit -m "Update bot state [skip ci]"
-              git pull --rebase
+              git fetch origin
+              git reset --soft origin/main
               git push
             fi
           else
