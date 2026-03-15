@@ -408,18 +408,19 @@ def main():
 
     # 3) Rappels T-15 robustes (anti-miss)
     for dt, ev in events:
+        if not is_relevant_event(ev):
+            continue
 
         reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
-
         key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
 
         # ----- REMINDER -----
         if reminder_time <= now < dt:
             if key not in state["sent_reminders"]:
-            minutes_left = max(0, int((dt - now).total_seconds() / 60))
-            msg = format_macro_alert(dt, ev, minutes_left)
-            tg_send(msg)
-            state["sent_reminders"][key] = now.isoformat()
+                minutes_left = max(0, int((dt - now).total_seconds() / 60))
+                msg = format_macro_alert(dt, ev, minutes_left)
+                tg_send(msg)
+                state["sent_reminders"][key] = now.isoformat()
 
         # ----- RELEASE -----
         key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
