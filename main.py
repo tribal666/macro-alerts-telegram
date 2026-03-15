@@ -65,7 +65,7 @@ def load_state() -> dict:
         "sent_daily": {},
         "seen_events": [],
         "sent_releases": {},
-        "source_failures": 0
+        "source_failures": 0,
         "last_source_alert": None,
     }
 
@@ -240,7 +240,8 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         "Actifs concernés\n"
         f"{assets_block}"
     )
-    
+
+
 def format_release_alert(dt_local: datetime, ev: dict) -> str:
     cur = ev["country"]
     title = ev["title"]
@@ -391,7 +392,7 @@ def main():
         msg = format_macro_alert(dt, ev, minutes_left)
         tg_send(msg)
         state["sent_reminders"][key] = now.isoformat()
-        
+
         # Détection publication de la donnée
         key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
 
@@ -401,6 +402,7 @@ def main():
             state["sent_releases"][key_release] = now.isoformat()
 
     save_state(state)
+
 
 if __name__ == "__main__":
     main()
