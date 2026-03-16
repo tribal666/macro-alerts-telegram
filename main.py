@@ -380,7 +380,7 @@ def main():
         # Détection nouvelles annonces
         seen = set(state.get("seen_events", []))
         for dt, ev in events:
-            key = f"{dt.date()}_{ev['country']}_{ev['title']}"
+            key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
             
             # ne signaler que les nouvelles annonces dans les 24h
             if (dt - now).total_seconds() > 3600 * 12:
