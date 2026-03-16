@@ -437,6 +437,10 @@ def main():
         # Détection nouvelles annonces
         seen = set(state.get("seen_events", []))
         for dt, ev in events:
+            # ignorer événements trop anciens
+            if now - dt > timedelta(minutes=5):
+                continue
+            
             key = event_key(dt, ev)
 
             # ne traiter que les events entre -10 min et +12h
