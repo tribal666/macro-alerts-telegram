@@ -450,7 +450,9 @@ def main():
         # ----- RELEASE -----
         key_release = f"{dt.date()}_{ev['country']}_{ev['title']}"
 
-        if ev.get("actual") and key_release not in state["sent_releases"]:
+        actual = ev.get("actual")
+
+        if actual and actual != "-" and key_release not in state["sent_releases"]:
             msg = format_release_alert(dt, ev)
             tg_send(msg)
             state["sent_releases"][key_release] = now.isoformat()
