@@ -58,6 +58,27 @@ MACRO_EXPLAIN = {
     "FOMC": "Décision de politique monétaire de la Réserve fédérale.",
 }
 
+MACRO_DIRECTION = {
+
+    # inflation
+    "CPI": -1,
+    "Core CPI": -1,
+    "PPI": -1,
+    "Core PPI": -1,
+
+    # croissance
+    "GDP": 1,
+    "Retail Sales": 1,
+
+    # emploi
+    "Non-Farm": 1,
+    "Unemployment": -1,
+    "Jobless": -1,
+
+    # sentiment
+    "Consumer Sentiment": 1,
+}
+
 
 def load_state() -> dict:
     if STATE_FILE.exists():
@@ -306,17 +327,25 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
     surprise = compute_surprise(actual, forecast)
 
     surprise_text = ""
-    impact_text = ""
+    impact_text = "➖ Impact macro : neutre"
 
     if surprise is not None:
+
         surprise_text = f"\n⚡ Surprise : {surprise*100:+.2f}%"
 
-        if surprise > 0:
-            impact_text = f"📈 Impact probable : {cur} bullish"
-        elif surprise < 0:
-            impact_text = f"📉 Impact probable : {cur} bearish"
-        else:
-            impact_text = "➖ Impact probable : neutre"
+        direction = 1
+
+        for key in MACRO_DIRECTION:
+            if key.lower() in title.lower():
+                direction = MACRO_DIRECTION[key]
+                break
+
+        macro_effect = surprise * direction
+
+        if macro_effect > 0:
+            impact_text = f"📈 Impact macro : {cur} bullish"
+        elif macro_effect < 0:
+            impact_text = f"📉 Impact macro : {cur} bearish"
 
     return (
         "🚨 DONNÉE MACRO PUBLIÉE\n\n"
