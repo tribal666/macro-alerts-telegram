@@ -377,7 +377,7 @@ def main():
             
             # ne signaler que les nouvelles annonces dans les 24h
             if (dt - now).total_seconds() > 3600 * 12:
-            continue
+                continue
         
             if key not in seen:
                 msg = (
