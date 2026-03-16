@@ -449,7 +449,7 @@ def main():
 
         # ----- RELEASE -----
         # ----- RELEASE -----
-        key_release = f"{dt.date()}_{ev['country']}_{ev['title']}"
+        key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
 
         actual = ev.get("actual")
  
