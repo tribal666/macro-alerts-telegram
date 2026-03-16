@@ -364,6 +364,13 @@ def format_daily_summary(
 
 def main():
     state = load_state()
+    
+    # sécurité structure state.json
+    state.setdefault("sent_releases", {})
+    state.setdefault("sent_reminders", {})
+    state.setdefault("sent_daily", {})
+    state.setdefault("seen_events", [])
+    
     now = datetime.now(TZ)
 
     # 1) Récupération events avec fallback + monitoring
