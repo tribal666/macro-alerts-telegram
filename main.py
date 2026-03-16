@@ -81,9 +81,7 @@ MACRO_DIRECTION = {
 
 
 def load_state() -> dict:
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-    return {
+    default_state = {
         "sent_reminders": {},
         "sent_daily": {},
         "seen_events": [],
@@ -91,6 +89,17 @@ def load_state() -> dict:
         "source_failures": 0,
         "last_source_alert": None,
     }
+
+    if not STATE_FILE.exists():
+        return default_state
+
+    try:
+        content = STATE_FILE.read_text(encoding="utf-8").strip()
+        if not content:
+            return default_state
+        return json.loads(content)
+    except Exception:
+        return default_state
 
 
 def is_critical_event(title: str) -> bool:
