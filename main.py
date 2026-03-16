@@ -326,6 +326,10 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
 
     surprise = compute_surprise(actual, forecast)
 
+    # ignorer les surprises trop faibles
+    if surprise is not None and abs(surprise) < 0.02:
+        surprise = 0
+
     surprise_text = ""
     impact_text = "➖ Impact macro : neutre"
 
