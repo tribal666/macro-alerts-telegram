@@ -503,11 +503,15 @@ def main():
         # ----- RELEASE -----
         if dt > now + timedelta(minutes=1):
             continue
+        if abs((now - dt).total_seconds()) > 900:
+            continue
         
         actual = ev.get("actual")
 
         # clé unique de la news
-        key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
+        title_key = ev["title"].strip().lower()
+
+        key_release = f"{dt.date()}::{ev['country']}::{title_key}"
 
         # créer la structure si elle n'existe pas
         state.setdefault("sent_releases", {})
