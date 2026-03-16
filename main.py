@@ -453,7 +453,7 @@ def main():
 
         actual = ev.get("actual")
 
-        recent_release = 0 <= (now - dt).total_seconds() <= 1800
+        recent_release = 0 <= (now - dt).total_seconds() <= 300
 
         if recent_release and actual and actual != "-" and key_release not in state["sent_releases"]:
             msg = format_release_alert(dt, ev)
