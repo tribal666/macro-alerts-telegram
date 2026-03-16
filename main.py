@@ -251,6 +251,7 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         f"{assets_block}"
     )
 
+
 def parse_ff_number(value: str | None):
     if not value:
         return None
@@ -279,6 +280,20 @@ def parse_ff_number(value: str | None):
 
     except Exception:
         return None
+    
+def compute_surprise(actual, forecast):
+    a = parse_ff_number(actual)
+    f = parse_ff_number(forecast)
+
+    if a is None or f is None:
+        return None
+
+    try:
+        if f == 0:
+            return None
+        return (a - f) / abs(f)
+    except Exception:
+        return None    
 
 def format_release_alert(dt_local: datetime, ev: dict) -> str:
     cur = ev["country"]
@@ -288,20 +303,17 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
     forecast = ev.get("forecast")
     previous = ev.get("previous")
 
-    a = parse_ff_number(actual)
-    f = parse_ff_number(forecast)
+    surprise = compute_surprise(actual, forecast)
 
     surprise_text = ""
     impact_text = ""
 
-    if a is not None and f is not None:
-        diff = a - f
+    if surprise is not None:
+        surprise_text = f"\n⚡ Surprise : {surprise*100:+.2f}%"
 
-        surprise_text = f"\n⚡ Surprise : {diff:+}"
-
-        if diff > 0:
+        if surprise > 0:
             impact_text = f"📈 Impact probable : {cur} bullish"
-        elif diff < 0:
+        elif surprise < 0:
             impact_text = f"📉 Impact probable : {cur} bearish"
         else:
             impact_text = "➖ Impact probable : neutre"
@@ -364,13 +376,13 @@ def format_daily_summary(
 
 def main():
     state = load_state()
-    
+
     # sécurité structure state.json
     state.setdefault("sent_releases", {})
     state.setdefault("sent_reminders", {})
     state.setdefault("sent_daily", {})
     state.setdefault("seen_events", [])
-    
+
     now = datetime.now(TZ)
 
     # 1) Récupération events avec fallback + monitoring
@@ -381,11 +393,11 @@ def main():
         seen = set(state.get("seen_events", []))
         for dt, ev in events:
             key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
-            
+
             # ne traiter que les events entre -10 min et +12h
             if not (-600 <= (dt - now).total_seconds() <= 43200):
                 continue
-        
+
             if key not in seen:
                 msg = (
                     "⚡ NOUVELLE NEWS MACRO\n\n"
@@ -479,6 +491,7 @@ def main():
             save_state(state)
 
             continue
-    
+
+
 if __name__ == "__main__":
     main()
