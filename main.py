@@ -406,6 +406,9 @@ def format_daily_summary(
 
     return msg
 
+def event_key(dt, ev):
+    title = ev["title"].strip().lower()
+    return f"{dt.isoformat()}::{ev['country']}::{title}"
 
 def main():
     state = load_state()
@@ -425,7 +428,7 @@ def main():
         # Détection nouvelles annonces
         seen = set(state.get("seen_events", []))
         for dt, ev in events:
-            key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+            key = event_key(dt, ev)
 
             # ne traiter que les events entre -10 min et +12h
             if not (-600 <= (dt - now).total_seconds() <= 43200):
@@ -490,7 +493,7 @@ def main():
             continue
 
         reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
-        key = f"{dt.isoformat()}::{ev['country']}::{ev['impact']}::{ev['title']}"
+        key = event_key(dt, ev)
 
         # ----- REMINDER -----
         if reminder_time <= now < dt:
@@ -511,7 +514,7 @@ def main():
         # clé unique de la news
         title_key = ev["title"].strip().lower()
 
-        key_release = f"{dt.date()}::{ev['country']}::{title_key}"
+        key_release = event_key(dt, ev)
 
         # créer la structure si elle n'existe pas
         state.setdefault("sent_releases", {})
