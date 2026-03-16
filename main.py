@@ -468,6 +468,9 @@ def main():
                 state["sent_reminders"][key] = now.isoformat()
 
         # ----- RELEASE -----
+        if dt > now + timedelta(minutes=1):
+            continue
+        
         actual = ev.get("actual")
 
         # clé unique de la news
@@ -481,7 +484,7 @@ def main():
             continue
 
         # si la donnée existe → envoyer
-        if actual and actual != "-":
+        if actual and actual.strip() and actual != "-":
             msg = format_release_alert(dt, ev)
             tg_send(msg)
 
