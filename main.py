@@ -456,24 +456,26 @@ def main():
                 state["sent_reminders"][key] = now.isoformat()
 
         # ----- RELEASE -----
-        release_key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
-
         actual = ev.get("actual")
 
-        # ne pas renvoyer si déjà traité
-        if release_key in state.get("seen_events", []):
-            continue
+        # ne traiter que les releases très récentes
+        seconds_since_release = (now - dt).total_seconds()
 
-        # envoyer seulement si la donnée existe
-        if actual and actual != "-":
-            msg = format_release_alert(dt, ev)
-            tg_send(msg)
+        if (
+            actual
+            and actual != "-"
+            and 0 <= seconds_since_release <= 300
+        ):
+            key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
 
-        # mémoriser
-        state.setdefault("seen_events", [])
-        state["seen_events"].append(release_key)
+            if key_release not in state.setdefault("sent_releases", {}):
+                msg = format_release_alert(dt, ev)
+                tg_send(msg)
 
-        save_state(state)
+                state["sent_releases"][key_release] = now.isoformat()
+                save_state(state)
+
+                continue
     
 if __name__ == "__main__":
     main()
