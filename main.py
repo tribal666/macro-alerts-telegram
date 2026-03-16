@@ -382,6 +382,9 @@ def main():
         for dt, ev in events:
             key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
             
+            if dt < now - timedelta(minutes=10):
+                continue
+            
             # ne signaler que les nouvelles annonces dans les 24h
             if (dt - now).total_seconds() > 3600 * 12:
                 continue
