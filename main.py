@@ -458,24 +458,27 @@ def main():
         # ----- RELEASE -----
         actual = ev.get("actual")
 
-        # ne traiter que les releases très récentes
-        seconds_since_release = (now - dt).total_seconds()
+        # clé unique de la news
+        key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
 
-        if (
-            actual
-            and actual != "-"
-            and 0 <= seconds_since_release <= 300
-        ):
-            key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
+        # créer la structure si elle n'existe pas
+        state.setdefault("sent_releases", {})
 
-            if key_release not in state.setdefault("sent_releases", {}):
-                msg = format_release_alert(dt, ev)
-                tg_send(msg)
+        # si déjà envoyée → ne rien faire
+        if key_release in state["sent_releases"]:
+            continue
 
-                state["sent_releases"][key_release] = now.isoformat()
-                save_state(state)
+        # si la donnée existe → envoyer
+        if actual and actual != "-":
+            msg = format_release_alert(dt, ev)
+            tg_send(msg)
 
-                continue
+            # mémoriser immédiatement
+            state["sent_releases"][key_release] = now.isoformat()
+
+            save_state(state)
+
+            continue
     
 if __name__ == "__main__":
     main()
