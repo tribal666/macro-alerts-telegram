@@ -374,11 +374,11 @@ def main():
         seen = set(state.get("seen_events", []))
         for dt, ev in events:
             key = f"{dt.date()}_{ev['country']}_{ev['title']}"
-
+            
             # ne signaler que les nouvelles annonces dans les 24h
             if (dt - now).total_seconds() > 3600 * 12:
             continue
-
+        
             if key not in seen:
                 msg = (
                     "⚡ NOUVELLE NEWS MACRO\n\n"
