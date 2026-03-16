@@ -251,6 +251,34 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         f"{assets_block}"
     )
 
+def parse_ff_number(value: str | None):
+    if not value:
+        return None
+
+    try:
+        v = value.strip()
+
+        multiplier = 1
+
+        if v.endswith("%"):
+            v = v[:-1]
+
+        if v.endswith("K"):
+            multiplier = 1_000
+            v = v[:-1]
+
+        if v.endswith("M"):
+            multiplier = 1_000_000
+            v = v[:-1]
+
+        if v.endswith("B"):
+            multiplier = 1_000_000_000
+            v = v[:-1]
+
+        return float(v) * multiplier
+
+    except Exception:
+        return None
 
 def format_release_alert(dt_local: datetime, ev: dict) -> str:
     cur = ev["country"]
@@ -260,26 +288,23 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
     forecast = ev.get("forecast")
     previous = ev.get("previous")
 
-    surprise = ""
-    impact = ""
+    a = parse_ff_number(actual)
+    f = parse_ff_number(forecast)
 
-    try:
-        if actual and forecast:
-            a = float(actual.replace("%", "").replace("K", ""))
-            f = float(forecast.replace("%", "").replace("K", ""))
-            diff = a - f
+    surprise_text = ""
+    impact_text = ""
 
-            surprise = f"\n⚡ Surprise : {diff:+}"
+    if a is not None and f is not None:
+        diff = a - f
 
-            if diff > 0:
-                impact = f"📈 Impact probable : {cur} bullish"
-            elif diff < 0:
-                impact = f"📉 Impact probable : {cur} bearish"
-            else:
-                impact = "➖ Impact probable : neutre"
+        surprise_text = f"\n⚡ Surprise : {diff:+}"
 
-    except Exception:
-        pass
+        if diff > 0:
+            impact_text = f"📈 Impact probable : {cur} bullish"
+        elif diff < 0:
+            impact_text = f"📉 Impact probable : {cur} bearish"
+        else:
+            impact_text = "➖ Impact probable : neutre"
 
     return (
         "🚨 DONNÉE MACRO PUBLIÉE\n\n"
@@ -288,8 +313,8 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
         f"Actual : {actual}\n"
         f"Forecast : {forecast}\n"
         f"Previous : {previous}"
-        f"{surprise}\n\n"
-        f"{impact}\n\n"
+        f"{surprise_text}\n\n"
+        f"{impact_text}\n\n"
         f"🕒 {dt_local.strftime('%H:%M')} (Paris)"
     )
 
@@ -348,7 +373,7 @@ def main():
         # Détection nouvelles annonces
         seen = set(state.get("seen_events", []))
         for dt, ev in events:
-            key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+            key = f"{dt.date()}_{ev['country']}_{ev['title']}"
             # ignore les événements trop lointains (ex : semaine complète dimanche)
             if (dt - now).days > 1:
                 continue
@@ -364,7 +389,7 @@ def main():
                 tg_send(msg)
                 seen.add(key)
 
-        state["seen_events"] = list(seen)
+        state["seen_events"] = list(seen)[-200:]
         state["source_failures"] = 0
 
     except Exception as e:
@@ -423,7 +448,7 @@ def main():
                 state["sent_reminders"][key] = now.isoformat()
 
         # ----- RELEASE -----
-        key_release = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
+        key_release = f"{dt.date()}_{ev['country']}_{ev['title']}"
 
         if ev.get("actual") and key_release not in state["sent_releases"]:
             msg = format_release_alert(dt, ev)
