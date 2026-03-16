@@ -458,20 +458,23 @@ def main():
         # ----- RELEASE -----
         key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
 
-        if key_release in state["sent_releases"]:
+        # si déjà envoyé → ne rien faire
+        if key_release in state.get("sent_releases", {}):
             continue
 
         actual = ev.get("actual")
 
-        recent_release = 0 <= (now - dt).total_seconds() <= 600
-
-        if recent_release and actual and actual != "-":
+        # envoyer uniquement si la donnée existe
+        if actual and actual != "-":
             msg = format_release_alert(dt, ev)
             tg_send(msg)
+
+            # mémoriser immédiatement
+            state.setdefault("sent_releases", {})
             state["sent_releases"][key_release] = now.isoformat()
 
-    save_state(state)
-
-
+            # sauvegarder tout de suite
+            save_state(state)
+    
 if __name__ == "__main__":
     main()
