@@ -456,25 +456,24 @@ def main():
                 state["sent_reminders"][key] = now.isoformat()
 
         # ----- RELEASE -----
-        key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
-
-        # si déjà envoyé → ne rien faire
-        if key_release in state.get("sent_releases", {}):
-            continue
+        release_key = f"{dt.isoformat()}_{ev['country']}_{ev['title']}"
 
         actual = ev.get("actual")
 
-        # envoyer uniquement si la donnée existe
+        # ne pas renvoyer si déjà traité
+        if release_key in state.get("seen_events", []):
+            continue
+
+        # envoyer seulement si la donnée existe
         if actual and actual != "-":
             msg = format_release_alert(dt, ev)
             tg_send(msg)
 
-            # mémoriser immédiatement
-            state.setdefault("sent_releases", {})
-            state["sent_releases"][key_release] = now.isoformat()
+        # mémoriser
+        state.setdefault("seen_events", [])
+        state["seen_events"].append(release_key)
 
-            # sauvegarder tout de suite
-            save_state(state)
+        save_state(state)
     
 if __name__ == "__main__":
     main()
