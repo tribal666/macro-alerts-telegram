@@ -448,12 +448,13 @@ def main():
                 state["sent_reminders"][key] = now.isoformat()
 
         # ----- RELEASE -----
-        # ----- RELEASE -----
         key_release = f"{dt.isoformat()}::{ev['country']}::{ev['title']}"
 
         actual = ev.get("actual")
- 
-        if now >= dt and actual and actual != "-" and key_release not in state["sent_releases"]:
+
+        recent_release = 0 <= (now - dt).total_seconds() <= 1800
+
+        if recent_release and actual and actual != "-" and key_release not in state["sent_releases"]:
             msg = format_release_alert(dt, ev)
             tg_send(msg)
             state["sent_releases"][key_release] = now.isoformat()
