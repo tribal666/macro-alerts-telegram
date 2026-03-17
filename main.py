@@ -59,22 +59,18 @@ MACRO_EXPLAIN = {
 }
 
 MACRO_DIRECTION = {
-
     # inflation
     "CPI": -1,
     "Core CPI": -1,
     "PPI": -1,
     "Core PPI": -1,
-
     # croissance
     "GDP": 1,
     "Retail Sales": 1,
-
     # emploi
     "Non-Farm": 1,
     "Unemployment": -1,
     "Jobless": -1,
-
     # sentiment
     "Consumer Sentiment": 1,
 }
@@ -310,7 +306,8 @@ def parse_ff_number(value: str | None):
 
     except Exception:
         return None
-    
+
+
 def compute_surprise(actual, forecast):
     a = parse_ff_number(actual)
     f = parse_ff_number(forecast)
@@ -323,7 +320,8 @@ def compute_surprise(actual, forecast):
             return None
         return (a - f) / abs(f)
     except Exception:
-        return None    
+        return None
+
 
 def format_release_alert(dt_local: datetime, ev: dict) -> str:
     cur = ev["country"]
@@ -415,9 +413,11 @@ def format_daily_summary(
 
     return msg
 
+
 def event_key(dt, ev):
     title = ev["title"].strip().lower()
     return f"{dt.isoformat()}::{ev['country']}::{title}"
+
 
 def main():
     state = load_state()
@@ -440,7 +440,7 @@ def main():
             # ignorer événements trop anciens
             if now - dt > timedelta(minutes=5):
                 continue
-            
+
             key = event_key(dt, ev)
 
             # ne traiter que les events entre -10 min et +12h
@@ -521,7 +521,7 @@ def main():
             continue
         if abs((now - dt).total_seconds()) > 900:
             continue
-        
+
         actual = ev.get("actual")
 
         # clé unique de la news
@@ -547,6 +547,7 @@ def main():
             save_state(state)
 
             continue
+    save_state(state)
 
 
 if __name__ == "__main__":
