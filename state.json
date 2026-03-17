@@ -1,7 +1,9 @@
 {
   "sent_reminders": {},
   "sent_daily": {},
-  "seen_events": [],
+  "seen_events": [
+    "2026-03-17T15:00:00+01:00::USD::pending home sales m/m"
+  ],
   "sent_releases": {},
   "source_failures": 0,
   "last_source_alert": null
