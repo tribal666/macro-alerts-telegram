@@ -519,7 +519,7 @@ def main():
         # ----- RELEASE -----
         if dt > now + timedelta(minutes=1):
             continue
-        if abs((now - dt).total_seconds()) > 900:
+        if now < dt or (now - dt).total_seconds() > 60:
             continue
 
         actual = ev.get("actual")
