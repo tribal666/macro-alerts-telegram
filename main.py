@@ -421,6 +421,9 @@ def event_key(dt, ev):
 
 def main():
     state = load_state()
+    
+    print("CWD:", os.getcwd())
+    print("STATE PATH:", STATE_FILE.resolve())
 
     # sécurité structure state.json
     state.setdefault("sent_releases", {})
