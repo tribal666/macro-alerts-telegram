@@ -17,7 +17,7 @@ FF_XML_URLS = [
     "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.xml",
 ]
 
-STATE_FILE = Path("state.json")
+STATE_FILE = Path.cwd() / "state.json"
 
 # Paramètres
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
