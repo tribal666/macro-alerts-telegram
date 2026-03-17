@@ -2,7 +2,9 @@
   "sent_reminders": {
     "2026-03-17T15:00:00+01:00::USD::pending home sales m/m": "2026-03-17T14:45:23.997499+01:00"
   },
-  "sent_daily": {},
+  "sent_daily": {
+    "2026-03-18": "2026-03-17T22:00:38.358825+01:00"
+  },
   "seen_events": [
     "2026-03-17T15:00:00+01:00::USD::pending home sales m/m"
   ],
