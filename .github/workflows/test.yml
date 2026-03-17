@@ -20,9 +20,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: main
+        fetch-depth: 0
 
+      - name: Setup git
+        run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
