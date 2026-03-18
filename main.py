@@ -792,9 +792,9 @@ def main():
                 state["sent_reminders"][key] = now.isoformat()
 
         # ----- RELEASE -----
-        if dt > now + timedelta(minutes=1):
+        if now < dt:
             continue
-        if now < dt or (now - dt).total_seconds() > 60:
+        if (now - dt).total_seconds() > 600:
             continue
 
         actual = ev.get("actual")
