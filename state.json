@@ -7,8 +7,8 @@
   },
   "seen_events": [
     "2026-03-18T13:30:00+01:00::USD::ppi m/m",
-    "2026-03-17T15:00:00+01:00::USD::pending home sales m/m",
-    "2026-03-18T13:30:00+01:00::USD::core ppi m/m"
+    "2026-03-18T13:30:00+01:00::USD::core ppi m/m",
+    "2026-03-17T15:00:00+01:00::USD::pending home sales m/m"
   ],
   "sent_releases": {},
   "source_failures": 0,
