@@ -479,18 +479,14 @@ def is_relevant_event(ev: dict) -> bool:
 
 def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     cur = ev["country"]
-    imp = ev["impact"].upper()
+    impact = ev["impact"]
     title = ev["title"]
+
     title_fr = smart_translate_event(title)
+    icon = event_priority_icon(title, impact)
 
     forecast = ev.get("forecast")
     previous = ev.get("previous")
-
-    explain = ""
-    for key in MACRO_EXPLAIN:
-        if key.lower() in title.lower():
-            explain = MACRO_EXPLAIN[key]
-            break
 
     values = ""
     if forecast:
@@ -498,27 +494,17 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     if previous:
         values += f"\n📊 Précédent : {previous}"
 
-    if imp == "HIGH":
-        if is_critical_event(title):
-            impact_icon = "🔥🔥🔥 DISCOURS MAJEUR 🔥🔥🔥"
-        else:
-            impact_icon = "🚨🚨🚨 HIGH IMPACT 🚨🚨🚨"
-    else:
-        impact_icon = "🟠 MEDIUM IMPACT"
-
     assets = relevant_assets_for_event(ev)
     assets_block = "\n".join(f"• {a}" for a in assets) if assets else "• (aucun)"
 
     return (
-        f"{impact_icon}\n\n"
+        f"{icon} ALERTE MACRO\n\n"
         f"⏰ Dans {minutes_left} min — {dt_local.strftime('%H:%M')} (Paris)\n\n"
         f"{flag_for_currency(cur)} {cur}\n"
         f"{title_fr}\n"
-        f"({title})\n\n"
-        f"{explain}"
+        f"({title})"
         f"{values}\n\n"
-        "Actifs concernés\n"
-        f"{assets_block}"
+        f"Actifs concernés\n{assets_block}"
     )
 
 def parse_ff_number(value: str | None):
@@ -630,13 +616,7 @@ def format_daily_summary(
     if not day_events:
         return header + "Aucune annonce pertinente."
 
-    # tri par priorité puis heure
-    day_events.sort(
-        key=lambda x: (
-            event_sort_priority(x[1]["title"], x[1]["impact"]),
-            x[0]
-        )
-    )
+    day_events.sort(key=lambda x: x[0])
 
     lines = []
     for dt_local, ev in day_events:
@@ -777,7 +757,8 @@ def main():
 
     # 3) Rappels T-15 robustes (anti-miss)
     for dt, ev in events:
-        if not is_relevant_event(ev):
+        # on autorise aussi les releases même si peu d'actifs
+        if not is_relevant_event(ev) and ev["impact"] != "High":
             continue
 
         reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
