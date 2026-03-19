@@ -772,14 +772,13 @@ def main():
                 tg_send(msg)
                 state["sent_reminders"][key] = now.isoformat()
 
-        # ----- RELEASE -----
+                # ----- RELEASE -----
         if now < dt:
             continue
-        if (now - dt).total_seconds() > 600:
+        if (now - dt).total_seconds() > 3600:
             continue
 
         actual = ev.get("actual")
-
         key_release = event_key(dt, ev)
 
         # créer la structure si elle n'existe pas
@@ -788,6 +787,18 @@ def main():
         # si déjà envoyée → ne rien faire
         if key_release in state["sent_releases"]:
             continue
+
+        print(
+            "RELEASE CHECK |",
+            dt.strftime("%H:%M"),
+            "|",
+            ev["country"],
+            "|",
+            ev["title"],
+            "| actual =", repr(actual),
+            "| forecast =", repr(ev.get("forecast")),
+            "| previous =", repr(ev.get("previous")),
+        )
 
         # si la donnée existe → envoyer
         if actual and actual.strip() and actual != "-":
