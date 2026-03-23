@@ -676,7 +676,7 @@ def main():
             # On n'alerte que si l'événement est nouveau
             if key not in seen:
                 # On évite de notifier des vieilleries déjà passées depuis longtemps
-                if dt >= now - timedelta(minutes=10):
+                if now - timedelta(minutes=10) <= dt <= now + timedelta(hours=12):
 
                     should_alert_new = False
 
