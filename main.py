@@ -26,12 +26,19 @@ ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
 def is_allowed_event(ev):
     impact = ev["impact"]
     currency = ev["country"]
+    title = ev.get("title", "").lower()
 
     if impact == "High":
         return True
 
+    # Medium USD toujours autorisé
     if impact == "Medium" and currency == "USD":
         return True
+
+    # Ajouter PMI Europe (très important en trading)
+    if impact == "Medium" and currency in {"EUR", "GBP"}:
+        if "pmi" in title:
+            return True
 
     return False
 
