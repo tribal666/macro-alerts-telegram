@@ -694,7 +694,20 @@ def main():
                     # alerte immédiate si événement critique type speech / conference
                     if is_critical_event(ev["title"]):
                         should_alert_new = True
-
+                     
+                    print(
+                        "NEW EVENT CHECK |",
+                        dt.strftime("%Y-%m-%d %H:%M"),
+                        "|",
+                        ev["country"],
+                        "|",
+                        ev["impact"],
+                        "|",
+                        ev["title"],
+                        "| key_seen =",
+                        key in seen,
+                    )
+                    
                     if should_alert_new:
                         impact_label = (
                             "🚨 HIGH IMPACT"
@@ -758,6 +771,18 @@ def main():
         now.hour == 22 and now.minute <= 15
     ):
         tomorrow_events = [(dt, ev) for dt, ev in events if dt.date() == tomorrow]
+        print("SUMMARY CHECK | tomorrow =", tomorrow.isoformat())
+        for dt, ev in tomorrow_events:
+            print(
+                "SUMMARY EVENT |",
+                dt.strftime("%Y-%m-%d %H:%M"),
+                "|",
+                ev["country"],
+                "|",
+                ev["impact"],
+                "|",
+                ev["title"],
+            )
         msg = format_daily_summary(tomorrow, tomorrow_events)
         tg_send(msg)
         state["sent_daily"][tomorrow_key] = now.isoformat()
