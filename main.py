@@ -1,10 +1,12 @@
 import os
+import re
 import json
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
+
 
 TZ = ZoneInfo("Europe/Paris")
 
@@ -21,36 +23,18 @@ STATE_FILE = Path.cwd() / "state.json"
 
 # Paramètres
 ALLOWED_CURRENCIES = {"USD", "EUR", "GBP"}
-
-
-def is_allowed_event(ev):
-    impact = ev["impact"]
-    currency = ev["country"]
-    title = ev.get("title", "").lower()
-
-    if impact == "High":
-        return True
-
-    # Medium USD toujours autorisé
-    if impact == "Medium" and currency == "USD":
-        return True
-
-    # Ajouter PMI Europe (très important en trading)
-    if impact == "Medium" and currency in {"EUR", "GBP"}:
-        if "pmi" in title:
-            return True
-
-    return False
-
-
-# ✅ TES ACTIFS SUIVIS (filtrage final)
 WATCHED_ASSETS = {"EURUSD", "GBPUSD", "XAUUSD", "DE30"}
 
 REMINDER_LEAD_MIN = 15
-REMINDER_WINDOW_MIN = 6  # tolérance, conservé pour compatibilité
 SOURCE_FAIL_ALERT_AFTER = 3  # nb d'échecs consécutifs avant alerte Telegram
 
 CRITICAL_KEYWORDS = ["speaks", "speech", "press conference", "testifies", "hearing"]
+
+FLAGS = {
+    "USD": "🇺🇸",
+    "EUR": "🇪🇺",
+    "GBP": "🇬🇧",
+}
 
 MACRO_EXPLAIN = {
     "CPI": "Indice des prix à la consommation. Mesure l'inflation.",
@@ -70,6 +54,8 @@ MACRO_DIRECTION = {
     "Core CPI": -1,
     "PPI": -1,
     "Core PPI": -1,
+    "PCE": -1,
+    "Core PCE": -1,
     # croissance
     "GDP": 1,
     "Retail Sales": 1,
@@ -79,14 +65,6 @@ MACRO_DIRECTION = {
     "Jobless": -1,
     # sentiment
     "Consumer Sentiment": 1,
-}
-
-import re
-
-FLAGS = {
-    "USD": "🇺🇸",
-    "EUR": "🇪🇺",
-    "GBP": "🇬🇧",
 }
 
 EXACT_TRANSLATIONS = {
@@ -147,6 +125,76 @@ EXACT_TRANSLATIONS = {
 }
 
 
+def default_state() -> dict:
+    return {
+        "sent_reminders": {},
+        "sent_daily": {},
+        "seen_events": [],
+        "sent_releases": {},
+        "source_failures": 0,
+        "last_source_alert": None,
+    }
+
+
+def ensure_state(state: dict) -> dict:
+    base = default_state()
+    if not isinstance(state, dict):
+        return base
+
+    for k, v in base.items():
+        state.setdefault(k, v)
+
+    if not isinstance(state["sent_reminders"], dict):
+        state["sent_reminders"] = {}
+    if not isinstance(state["sent_daily"], dict):
+        state["sent_daily"] = {}
+    if not isinstance(state["seen_events"], list):
+        state["seen_events"] = []
+    if not isinstance(state["sent_releases"], dict):
+        state["sent_releases"] = {}
+    if not isinstance(state["source_failures"], int):
+        state["source_failures"] = 0
+    if state["last_source_alert"] is not None and not isinstance(state["last_source_alert"], str):
+        state["last_source_alert"] = None
+
+    return state
+
+
+def load_state() -> dict:
+    if not STATE_FILE.exists():
+        return default_state()
+
+    try:
+        content = STATE_FILE.read_text(encoding="utf-8").strip()
+        if not content:
+            return default_state()
+        return ensure_state(json.loads(content))
+    except Exception:
+        return default_state()
+
+
+def save_state(state: dict) -> None:
+    state = ensure_state(state)
+    STATE_FILE.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def tg_send(text: str) -> None:
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    r = requests.post(
+        url,
+        json={
+            "chat_id": CHAT_ID,
+            "text": text,
+            "disable_web_page_preview": True,
+        },
+        timeout=20,
+    )
+    r.raise_for_status()
+
+
 def normalize_event_title(title: str) -> str:
     s = (title or "").strip().lower()
     s = s.replace("&amp;", "&")
@@ -154,6 +202,30 @@ def normalize_event_title(title: str) -> str:
     s = s.replace("-", " ")
     s = re.sub(r"\s+", " ", s)
     return s
+
+
+def is_critical_event(title: str) -> bool:
+    t = normalize_event_title(title)
+    return any(k in t for k in CRITICAL_KEYWORDS)
+
+
+def is_allowed_event(ev: dict) -> bool:
+    impact = (ev.get("impact") or "").strip()
+    currency = (ev.get("country") or "").strip().upper()
+    title = normalize_event_title(ev.get("title", ""))
+
+    if impact == "High":
+        return True
+
+    # Medium USD toujours autorisé
+    if impact == "Medium" and currency == "USD":
+        return True
+
+    # Medium EUR / GBP : on garde PMI
+    if impact == "Medium" and currency in {"EUR", "GBP"} and "pmi" in title:
+        return True
+
+    return False
 
 
 def smart_translate_event(title: str) -> str:
@@ -173,9 +245,7 @@ def smart_translate_event(title: str) -> str:
     if "unemployment" in key:
         return "Taux de chômage"
     if "retail sales" in key:
-        if "core" in key:
-            return "Ventes au détail hors éléments volatils"
-        return "Ventes au détail"
+        return "Ventes au détail hors éléments volatils" if "core" in key else "Ventes au détail"
     if "gdp" in key:
         if "flash" in key:
             return "PIB flash"
@@ -239,9 +309,7 @@ def smart_translate_event(title: str) -> str:
             return "Ventes de logements neufs"
         return "Ventes immobilières"
     if "durable goods" in key:
-        if "core" in key:
-            return "Commandes de biens durables hors transport"
-        return "Commandes de biens durables"
+        return "Commandes de biens durables hors transport" if "core" in key else "Commandes de biens durables"
     if "crude oil inventories" in key:
         return "Stocks hebdomadaires de pétrole brut"
     if "building permits" in key:
@@ -253,12 +321,12 @@ def smart_translate_event(title: str) -> str:
     if "current account" in key:
         return "Balance des paiements courants"
 
-    return title.strip()
-   
+    return (title or "").strip()
+
+
 def event_priority_icon(title: str, impact: str) -> str:
     t = normalize_event_title(title)
 
-    # priorité maximale : banques centrales / discours
     if (
         "fomc" in t
         or "federal funds rate" in t
@@ -272,7 +340,6 @@ def event_priority_icon(title: str, impact: str) -> str:
     ):
         return "🔥"
 
-    # très haute priorité : inflation / emploi / croissance
     if (
         "cpi" in t
         or "ppi" in t
@@ -285,8 +352,7 @@ def event_priority_icon(title: str, impact: str) -> str:
     ):
         return "🚨"
 
-    # high impact générique
-    if impact.upper() == "HIGH":
+    if (impact or "").upper() == "HIGH":
         return "⚠️"
 
     return "📌"
@@ -320,61 +386,16 @@ def event_sort_priority(title: str, impact: str) -> int:
     ):
         return 1
 
-    if impact.upper() == "HIGH":
+    if (impact or "").upper() == "HIGH":
         return 2
 
-    return 3   
-
-def load_state() -> dict:
-    default_state = {
-        "sent_reminders": {},
-        "sent_daily": {},
-        "seen_events": [],
-        "sent_releases": {},
-        "source_failures": 0,
-        "last_source_alert": None,
-    }
-
-    if not STATE_FILE.exists():
-        return default_state
-
-    try:
-        content = STATE_FILE.read_text(encoding="utf-8").strip()
-        if not content:
-            return default_state
-        return json.loads(content)
-    except Exception:
-        return default_state
-
-
-def is_critical_event(title: str) -> bool:
-    t = title.lower()
-    return any(k in t for k in CRITICAL_KEYWORDS)
-
-
-def save_state(state: dict) -> None:
-    STATE_FILE.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-
-
-def tg_send(text: str) -> None:
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    r = requests.post(
-        url,
-        json={
-            "chat_id": CHAT_ID,
-            "text": text,
-            "disable_web_page_preview": True,
-        },
-        timeout=20,
-    )
-    r.raise_for_status()
+    return 3
 
 
 def fetch_ff_xml() -> str:
     last_err = None
     headers = {"User-Agent": "macro-alerts-telegram/1.0"}
+
     for url in FF_XML_URLS:
         try:
             r = requests.get(url, headers=headers, timeout=25)
@@ -384,11 +405,11 @@ def fetch_ff_xml() -> str:
             last_err = RuntimeError(f"Unexpected content from {url}")
         except Exception as e:
             last_err = e
-            continue
+
     raise RuntimeError(f"All FF XML URLs failed. Last error: {last_err}")
 
 
-def parse_ff_datetime(date_str: str, time_str: str) -> datetime | None:
+def parse_ff_datetime(date_str: str, time_str: str):
     if not date_str or not time_str:
         return None
 
@@ -417,6 +438,7 @@ def fetch_events() -> list[tuple[datetime, dict]]:
     root = ET.fromstring(xml_text)
 
     events = []
+
     for ev in root.findall(".//event"):
         title = (ev.findtext("title") or "").strip()
         country = (ev.findtext("country") or "").strip().upper()
@@ -429,26 +451,24 @@ def fetch_events() -> list[tuple[datetime, dict]]:
 
         if country not in ALLOWED_CURRENCIES:
             continue
-        if not is_allowed_event({"impact": impact, "country": country}):
+
+        event_data = {
+            "title": title,
+            "country": country,
+            "impact": impact,
+            "forecast": forecast,
+            "previous": previous,
+            "actual": actual,
+        }
+
+        if not is_allowed_event(event_data):
             continue
 
         dt = parse_ff_datetime(date_s, time_s)
         if dt is None:
             continue
 
-        events.append(
-            (
-                dt,
-                {
-                    "title": title,
-                    "country": country,
-                    "impact": impact,
-                    "forecast": forecast,
-                    "previous": previous,
-                    "actual": actual,
-                },
-            )
-        )
+        events.append((dt, event_data))
 
     events.sort(key=lambda x: x[0])
     return events
@@ -459,19 +479,15 @@ def flag_for_currency(cur: str) -> str:
 
 
 def impacted_assets(currency: str) -> list[str]:
-    """
-    Mapping "trading" (simple et utile).
-    - USD impacte: EURUSD, GBPUSD, XAUUSD
-    - EUR impacte: EURUSD + DE30
-    - GBP impacte: GBPUSD
-    """
-    c = currency.upper()
+    c = (currency or "").upper()
+
     if c == "USD":
         return ["EURUSD", "GBPUSD", "XAUUSD"]
     if c == "EUR":
         return ["EURUSD", "DE30"]
     if c == "GBP":
         return ["GBPUSD"]
+
     return []
 
 
@@ -484,6 +500,11 @@ def is_relevant_event(ev: dict) -> bool:
     return len(relevant_assets_for_event(ev)) > 0
 
 
+def event_key(dt: datetime, ev: dict) -> str:
+    title = normalize_event_title(ev["title"])
+    return f"{dt.isoformat()}::{ev['country']}::{title}"
+
+
 def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     cur = ev["country"]
     impact = ev["impact"]
@@ -492,8 +513,8 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
     title_fr = smart_translate_event(title)
     icon = event_priority_icon(title, impact)
 
-    forecast = ev.get("forecast")
-    previous = ev.get("previous")
+    forecast = ev.get("forecast") or ""
+    previous = ev.get("previous") or ""
 
     values = ""
     if forecast:
@@ -514,32 +535,33 @@ def format_macro_alert(dt_local: datetime, ev: dict, minutes_left: int) -> str:
         f"Actifs concernés\n{assets_block}"
     )
 
-def parse_ff_number(value: str | None):
+
+def parse_ff_number(value):
     if not value:
         return None
 
     try:
-        v = value.strip()
+        v = str(value).strip().replace(" ", "")
+        v = v.replace(",", "")
 
         multiplier = 1
 
         if v.endswith("%"):
             v = v[:-1]
-
         if v.endswith("K"):
             multiplier = 1_000
             v = v[:-1]
-
-        if v.endswith("M"):
+        elif v.endswith("M"):
             multiplier = 1_000_000
             v = v[:-1]
-
-        if v.endswith("B"):
+        elif v.endswith("B"):
             multiplier = 1_000_000_000
             v = v[:-1]
 
-        return float(v) * multiplier
+        if v in {"", "-", "—", "N/A", "n/a"}:
+            return None
 
+        return float(v) * multiplier
     except Exception:
         return None
 
@@ -548,12 +570,10 @@ def compute_surprise(actual, forecast):
     a = parse_ff_number(actual)
     f = parse_ff_number(forecast)
 
-    if a is None or f is None:
+    if a is None or f is None or f == 0:
         return None
 
     try:
-        if f == 0:
-            return None
         return (a - f) / abs(f)
     except Exception:
         return None
@@ -564,13 +584,12 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
     title = ev["title"]
     title_fr = smart_translate_event(title)
 
-    actual = ev.get("actual")
-    forecast = ev.get("forecast")
-    previous = ev.get("previous")
+    actual = ev.get("actual") or "-"
+    forecast = ev.get("forecast") or "-"
+    previous = ev.get("previous") or "-"
 
     surprise = compute_surprise(actual, forecast)
 
-    # ignorer les surprises trop faibles
     if surprise is not None and abs(surprise) < 0.02:
         surprise = 0
 
@@ -578,11 +597,9 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
     impact_text = "➖ Impact macro : neutre"
 
     if surprise is not None:
-
-        surprise_text = f"\n⚡ Surprise : {surprise*100:+.2f}%"
+        surprise_text = f"\n⚡ Surprise : {surprise * 100:+.2f}%"
 
         direction = 1
-
         for key in MACRO_DIRECTION:
             if key.lower() in title.lower():
                 direction = MACRO_DIRECTION[key]
@@ -609,21 +626,15 @@ def format_release_alert(dt_local: datetime, ev: dict) -> str:
     )
 
 
-def format_daily_summary(
-    day: datetime.date, events: list[tuple[datetime, dict]]
-) -> str:
+def format_daily_summary(day, events: list[tuple[datetime, dict]]) -> str:
     header = f"🗓️ Macro de demain — {day.strftime('%d/%m/%Y')}\n\n"
 
-    day_events = []
-    for dt_local, ev in sorted(events, key=lambda x: x[0]):
-        if dt_local.date() != day:
-            continue
-        day_events.append((dt_local, ev))
+    day_events = [(dt, ev) for dt, ev in events if dt.date() == day]
 
     if not day_events:
         return header + "Aucune annonce pertinente."
 
-    day_events.sort(key=lambda x: x[0])
+    day_events.sort(key=lambda x: (x[0], event_sort_priority(x[1]["title"], x[1]["impact"])))
 
     lines = []
     for dt_local, ev in day_events:
@@ -637,99 +648,81 @@ def format_daily_summary(
         assets = relevant_assets_for_event(ev)
         assets_str = ", ".join(assets) if assets else "-"
 
-        line = (
+        lines.append(
             f"{icon} {dt_local.strftime('%H:%M')} {cur} "
             f"{title_fr} ({title}) ({assets_str})"
         )
 
-        lines.append(line)
-
-    legend = (
-        "Légende : 🔥 priorité max | 🚨 très important | ⚠️ impact élevé | 📌 secondaire\n\n"
-    )
-
+    legend = "Légende : 🔥 priorité max | 🚨 très important | ⚠️ impact élevé | 📌 secondaire\n\n"
     return header + legend + "\n".join(lines)
 
 
-def event_key(dt, ev):
-    title = ev["title"].strip().lower()
-    return f"{dt.isoformat()}::{ev['country']}::{title}"
+def format_new_event_alert(dt_local: datetime, ev: dict) -> str:
+    impact_label = "🚨 HIGH IMPACT" if ev["impact"] == "High" else "⚠️ NOUVEL ÉVÉNEMENT"
+    title_fr = smart_translate_event(ev["title"])
+
+    msg = (
+        "🆕 ANNONCE AJOUTÉE EN COURS DE JOURNÉE\n\n"
+        f"{impact_label}\n\n"
+        f"{flag_for_currency(ev['country'])} {ev['country']}\n"
+        f"{title_fr}\n"
+        f"({ev['title']})\n\n"
+        f"📅 {dt_local.strftime('%d/%m')}\n"
+        f"🕒 {dt_local.strftime('%H:%M')} (Paris)"
+    )
+
+    if is_critical_event(ev["title"]):
+        msg += "\n\n🔥 Événement potentiellement très volatil."
+
+    return msg
+
+
+def should_send_new_event_alert(now: datetime, dt: datetime, ev: dict) -> bool:
+    if dt < now - timedelta(minutes=10):
+        return False
+    if dt > now + timedelta(hours=12):
+        return False
+    if ev["impact"] == "High":
+        return True
+    if is_critical_event(ev["title"]):
+        return True
+    return False
 
 
 def main():
     state = load_state()
-    
+    state = ensure_state(state)
+
     print("CWD:", os.getcwd())
     print("STATE PATH:", STATE_FILE.resolve())
 
-    # sécurité structure state.json
-    state.setdefault("sent_releases", {})
-    state.setdefault("sent_reminders", {})
-    state.setdefault("sent_daily", {})
-    state.setdefault("seen_events", [])
-
     now = datetime.now(TZ)
 
-    # 1) Récupération events avec fallback + monitoring
+    # 1) Récupération des events
     try:
         events = fetch_events()
 
-        # Détection des nouvelles annonces apparues en cours de route
         seen = set(state.get("seen_events", []))
 
         for dt, ev in events:
             key = event_key(dt, ev)
 
-            # On n'alerte que si l'événement est nouveau
             if key not in seen:
-                # On évite de notifier des vieilleries déjà passées depuis longtemps
-                if now - timedelta(minutes=10) <= dt <= now + timedelta(hours=12):
+                print(
+                    "NEW EVENT CHECK |",
+                    dt.strftime("%Y-%m-%d %H:%M"),
+                    "|",
+                    ev["country"],
+                    "|",
+                    ev["impact"],
+                    "|",
+                    ev["title"],
+                    "| key_seen =",
+                    key in seen,
+                )
 
-                    should_alert_new = False
-
-                    # alerte immédiate si high impact
-                    if ev["impact"] == "High":
-                        should_alert_new = True
-
-                    # alerte immédiate si événement critique type speech / conference
-                    if is_critical_event(ev["title"]):
-                        should_alert_new = True
-                     
-                    print(
-                        "NEW EVENT CHECK |",
-                        dt.strftime("%Y-%m-%d %H:%M"),
-                        "|",
-                        ev["country"],
-                        "|",
-                        ev["impact"],
-                        "|",
-                        ev["title"],
-                        "| key_seen =",
-                        key in seen,
-                    )
-                    
-                    if should_alert_new:
-                        impact_label = (
-                            "🚨 HIGH IMPACT"
-                            if ev["impact"] == "High"
-                            else "⚠️ NOUVEL ÉVÉNEMENT"
-                        )
-                        title_fr = smart_translate_event(ev["title"])
-
-                        msg = (
-                            "🆕 ANNONCE AJOUTÉE EN COURS DE JOURNÉE\n\n"
-                            f"{impact_label}\n\n"
-                            f"{flag_for_currency(ev['country'])} {ev['country']}\n"
-                            f"{title_fr}\n"
-                            f"({ev['title']})\n\n"
-                            f"📅 {dt.strftime('%d/%m')}\n"
-                            f"🕒 {dt.strftime('%H:%M')} (Paris)"
-                        )
-
-                        if is_critical_event(ev["title"]):
-                            msg += "\n\n🔥 Événement potentiellement très volatil."
-
-                        tg_send(msg)
+                if should_send_new_event_alert(now, dt, ev):
+                    tg_send(format_new_event_alert(dt, ev))
 
                 seen.add(key)
 
@@ -742,6 +735,7 @@ def main():
         if state["source_failures"] >= SOURCE_FAIL_ALERT_AFTER:
             last = state.get("last_source_alert")
             allow = True
+
             if last:
                 try:
                     last_dt = datetime.fromisoformat(last)
@@ -767,10 +761,9 @@ def main():
     tomorrow = (now + timedelta(days=1)).date()
     tomorrow_key = tomorrow.isoformat()
 
-    if tomorrow_key not in state["sent_daily"] and (
-        now.hour == 22 and now.minute <= 15
-    ):
+    if tomorrow_key not in state["sent_daily"] and now.hour == 22 and now.minute <= 15:
         tomorrow_events = [(dt, ev) for dt, ev in events if dt.date() == tomorrow]
+
         print("SUMMARY CHECK | tomorrow =", tomorrow.isoformat())
         for dt, ev in tomorrow_events:
             print(
@@ -783,42 +776,35 @@ def main():
                 "|",
                 ev["title"],
             )
-        msg = format_daily_summary(tomorrow, tomorrow_events)
-        tg_send(msg)
+
+        tg_send(format_daily_summary(tomorrow, tomorrow_events))
         state["sent_daily"][tomorrow_key] = now.isoformat()
 
-    # 3) Rappels T-15 robustes (anti-miss)
+    # 3) Rappels T-15 + releases
     for dt, ev in events:
-        # on autorise aussi les releases même si peu d'actifs
-        if not is_relevant_event(ev) and ev["impact"] != "High":
-            continue
-
-        reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
         key = event_key(dt, ev)
 
         # ----- REMINDER -----
-        if reminder_time <= now < dt:
-            if key not in state["sent_reminders"]:
-                minutes_left = max(0, int((dt - now).total_seconds() / 60))
-                msg = format_macro_alert(dt, ev, minutes_left)
-                tg_send(msg)
-                state["sent_reminders"][key] = now.isoformat()
+        if is_relevant_event(ev) or ev["impact"] == "High":
+            reminder_time = dt - timedelta(minutes=REMINDER_LEAD_MIN)
 
-                # ----- RELEASE -----
+            if reminder_time <= now < dt:
+                if key not in state["sent_reminders"]:
+                    minutes_left = max(0, int((dt - now).total_seconds() / 60))
+                    tg_send(format_macro_alert(dt, ev, minutes_left))
+                    state["sent_reminders"][key] = now.isoformat()
+
+        # ----- RELEASE -----
         if now < dt:
             continue
+
         if (now - dt).total_seconds() > 3600:
             continue
 
-        actual = ev.get("actual")
-        key_release = event_key(dt, ev)
-
-        # créer la structure si elle n'existe pas
-        state.setdefault("sent_releases", {})
-
-        # si déjà envoyée → ne rien faire
-        if key_release in state["sent_releases"]:
+        if key in state["sent_releases"]:
             continue
+
+        actual = (ev.get("actual") or "").strip()
 
         print(
             "RELEASE CHECK |",
@@ -832,17 +818,11 @@ def main():
             "| previous =", repr(ev.get("previous")),
         )
 
-        # si la donnée existe → envoyer
-        if actual and actual.strip() and actual != "-":
-            msg = format_release_alert(dt, ev)
-            tg_send(msg)
-
-            # mémoriser immédiatement
-            state["sent_releases"][key_release] = now.isoformat()
-
+        if actual and actual not in {"-", "—"}:
+            tg_send(format_release_alert(dt, ev))
+            state["sent_releases"][key] = now.isoformat()
             save_state(state)
 
-            continue
     save_state(state)
 
 
