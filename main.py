@@ -712,6 +712,23 @@ def main():
         events = fetch_events()
         print("FETCH OK | total filtered events =", len(events))
 
+        for dt, ev in events:
+            delta_min = round((dt - now).total_seconds() / 60, 1)
+            print(
+                "EVENT |",
+                dt.strftime("%Y-%m-%d %H:%M"),
+                "|",
+                ev["country"],
+                "|",
+                ev["impact"],
+                "|",
+                ev["title"],
+                "| delta_min =",
+                delta_min,
+                "| actual =",
+                repr(ev.get("actual")),
+            )
+
         seen = set(state.get("seen_events", []))
         new_events_count = 0
         new_alerts_sent = 0
