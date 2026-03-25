@@ -693,23 +693,36 @@ def main():
     state = load_state()
     state = ensure_state(state)
 
+    print("========== RUN START ==========")
     print("CWD:", os.getcwd())
     print("STATE PATH:", STATE_FILE.resolve())
 
     now = datetime.now(TZ)
+    print("NOW (Paris):", now.isoformat())
+    print(
+        "STATE COUNTS | reminders =", len(state["sent_reminders"]),
+        "| daily =", len(state["sent_daily"]),
+        "| seen =", len(state["seen_events"]),
+        "| releases =", len(state["sent_releases"]),
+        "| source_failures =", state["source_failures"],
+    )
 
     # 1) Récupération des events
     try:
         events = fetch_events()
+        print("FETCH OK | total filtered events =", len(events))
 
         seen = set(state.get("seen_events", []))
+        new_events_count = 0
+        new_alerts_sent = 0
 
         for dt, ev in events:
             key = event_key(dt, ev)
 
             if key not in seen:
+                new_events_count += 1
                 print(
-                    "NEW EVENT CHECK |",
+                    "NEW EVENT |",
                     dt.strftime("%Y-%m-%d %H:%M"),
                     "|",
                     ev["country"],
@@ -717,20 +730,26 @@ def main():
                     ev["impact"],
                     "|",
                     ev["title"],
-                    "| key_seen =",
-                    key in seen,
                 )
 
                 if should_send_new_event_alert(now, dt, ev):
+                    print("NEW EVENT ALERT SENT |", key)
                     tg_send(format_new_event_alert(dt, ev))
+                    new_alerts_sent += 1
 
                 seen.add(key)
 
         state["seen_events"] = list(seen)[-300:]
         state["source_failures"] = 0
 
+        print(
+            "NEW EVENTS SUMMARY | found =", new_events_count,
+            "| alerts_sent =", new_alerts_sent,
+        )
+
     except Exception as e:
         state["source_failures"] = int(state.get("source_failures", 0)) + 1
+        print("FETCH ERROR |", type(e).__name__, "|", str(e))
 
         if state["source_failures"] >= SOURCE_FAIL_ALERT_AFTER:
             last = state.get("last_source_alert")
@@ -753,34 +772,33 @@ def main():
                     f"Détail: {type(e).__name__}: {e}"
                 )
                 state["last_source_alert"] = now.isoformat()
+                print("SOURCE ALERT SENT")
 
         save_state(state)
+        print("STATE SAVED AFTER FETCH ERROR")
+        print("========== RUN END ==========")
         return
 
     # 2) Résumé à 22:00 Paris pour le lendemain
     tomorrow = (now + timedelta(days=1)).date()
     tomorrow_key = tomorrow.isoformat()
 
+    print("SUMMARY WINDOW CHECK | tomorrow =", tomorrow_key)
+
     if tomorrow_key not in state["sent_daily"] and now.hour == 22 and now.minute <= 15:
         tomorrow_events = [(dt, ev) for dt, ev in events if dt.date() == tomorrow]
 
-        print("SUMMARY CHECK | tomorrow =", tomorrow.isoformat())
-        for dt, ev in tomorrow_events:
-            print(
-                "SUMMARY EVENT |",
-                dt.strftime("%Y-%m-%d %H:%M"),
-                "|",
-                ev["country"],
-                "|",
-                ev["impact"],
-                "|",
-                ev["title"],
-            )
-
+        print("SUMMARY SEND | events_for_tomorrow =", len(tomorrow_events))
         tg_send(format_daily_summary(tomorrow, tomorrow_events))
         state["sent_daily"][tomorrow_key] = now.isoformat()
+        print("SUMMARY SENT")
+    else:
+        print("SUMMARY SKIPPED")
 
     # 3) Rappels T-15 + releases
+    reminders_sent_now = 0
+    releases_sent_now = 0
+
     for dt, ev in events:
         key = event_key(dt, ev)
 
@@ -791,14 +809,17 @@ def main():
             if reminder_time <= now < dt:
                 if key not in state["sent_reminders"]:
                     minutes_left = max(0, int((dt - now).total_seconds() / 60))
+                    print("REMINDER SENT |", key, "| minutes_left =", minutes_left)
                     tg_send(format_macro_alert(dt, ev, minutes_left))
                     state["sent_reminders"][key] = now.isoformat()
+                    reminders_sent_now += 1
 
         # ----- RELEASE -----
         if now < dt:
             continue
 
-        if (now - dt).total_seconds() > 3600:
+        delay_sec = (now - dt).total_seconds()
+        if delay_sec > 3600:
             continue
 
         if key in state["sent_releases"]:
@@ -807,12 +828,9 @@ def main():
         actual = (ev.get("actual") or "").strip()
 
         print(
-            "RELEASE CHECK |",
-            dt.strftime("%H:%M"),
-            "|",
-            ev["country"],
-            "|",
-            ev["title"],
+            "RELEASE WINDOW |",
+            key,
+            "| delay_min =", round(delay_sec / 60, 1),
             "| actual =", repr(actual),
             "| forecast =", repr(ev.get("forecast")),
             "| previous =", repr(ev.get("previous")),
@@ -821,9 +839,19 @@ def main():
         if actual and actual not in {"-", "—"}:
             tg_send(format_release_alert(dt, ev))
             state["sent_releases"][key] = now.isoformat()
-            save_state(state)
+            releases_sent_now += 1
+            print("RELEASE SENT |", key)
+        else:
+            print("RELEASE SKIPPED | actual vide pour", key)
 
     save_state(state)
+
+    print(
+        "RUN SUMMARY | reminders_sent_now =", reminders_sent_now,
+        "| releases_sent_now =", releases_sent_now,
+    )
+    print("STATE SAVED")
+    print("========== RUN END ==========")
 
 
 if __name__ == "__main__":
