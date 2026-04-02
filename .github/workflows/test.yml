@@ -39,6 +39,18 @@ jobs:
 
       - name: Pull latest state
         run: git pull origin main
+        
+      - name: Debug trigger
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "actor=${{ github.actor }}"
+          echo "triggering_actor=${{ github.triggering_actor }}"
+          echo "ref=${{ github.ref }}"  
+          
+      - name: Dump event payload path
+        run: |
+          echo "event_path=$GITHUB_EVENT_PATH"
+          cat "$GITHUB_EVENT_PATH"    
 
       - name: Run
         env:
