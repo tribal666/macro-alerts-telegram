@@ -46,6 +46,25 @@ jobs:
           echo "actor=${{ github.actor }}"
           echo "triggering_actor=${{ github.triggering_actor }}"
           echo "ref=${{ github.ref }}"  
+
+      - name: Dump dispatch payload
+        run: |
+          echo "event_path=$GITHUB_EVENT_PATH"
+          python - <<'PY'
+          import json, os
+          p = os.environ["GITHUB_EVENT_PATH"]
+          with open(p, "r", encoding="utf-8") as f:
+              data = json.load(f)
+          print("EVENT JSON:")
+          print(json.dumps({
+              "action": data.get("action"),
+              "ref": data.get("ref"),
+              "inputs": data.get("inputs"),
+              "sender": data.get("sender", {}),
+              "repository": data.get("repository", {}).get("full_name"),
+              "workflow": data.get("workflow")
+          }, indent=2, ensure_ascii=False))
+          PY
           
       - name: Dump event payload path
         run: |
